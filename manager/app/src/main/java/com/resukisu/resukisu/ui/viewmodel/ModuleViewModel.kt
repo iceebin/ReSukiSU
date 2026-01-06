@@ -8,7 +8,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dergoogler.mmrl.platform.model.ModuleConfig
@@ -37,36 +36,22 @@ class ModuleViewModel : ViewModel() {
         private const val CUSTOM_USER_AGENT = "SukiSU-Ultra/2.0"
     }
 
-    // 模块大小缓存管理器
-    private lateinit var moduleSizeCache: ModuleSizeCache
-
-    fun initializeCache(context: Context) {
-        if (!::moduleSizeCache.isInitialized) {
-            moduleSizeCache = ModuleSizeCache(context)
-        }
-    }
-
     fun getModuleSize(dirId: String): String {
-        if (!::moduleSizeCache.isInitialized) {
-            return "0 KB"
-        }
-        val size = moduleSizeCache.getModuleSize(dirId)
-        return formatFileSize(size)
-    }
+        return formatFileSize(try {
+            val shell = getRootShell()
+            val command = "/data/adb/ksu/bin/busybox du -sb /data/adb/modules/$dirId"
+            val result = shell.newJob().add(command).to(ArrayList(), null).exec()
 
-    /**
-     * 刷新所有模块的大小缓存
-     * 只在安装、卸载、更新模块后调用
-     */
-    fun refreshModuleSizeCache() {
-        if (!::moduleSizeCache.isInitialized) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            Log.d(TAG, "开始刷新模块大小缓存")
-            val currentModules = modules.map { it.dirId }
-            moduleSizeCache.refreshCache(currentModules)
-            Log.d(TAG, "模块大小缓存刷新完成")
-        }
+            if (result.isSuccess && result.out.isNotEmpty()) {
+                val sizeStr = result.out.firstOrNull()?.split("\t")?.firstOrNull()
+                sizeStr?.toLongOrNull() ?: 0L
+            } else {
+                0L
+            }
+        } catch (e: Exception) {
+            Log.e(com.resukisu.resukisu.ui.viewmodel.TAG, "计算模块大小失败 $dirId: ${e.message}")
+            0L
+        })
     }
 
     class ModuleInfo(
@@ -129,8 +114,6 @@ class ModuleViewModel : ViewModel() {
 
     fun markNeedRefresh() {
         isNeedRefresh = true
-        // 标记需要刷新时，同时刷新大小缓存
-        refreshModuleSizeCache()
     }
 
     fun fetchModuleList() {
@@ -205,15 +188,6 @@ class ModuleViewModel : ViewModel() {
                         }
                     }
                 }
-
-                // 首次加载模块列表时，初始化缓存
-                if (::moduleSizeCache.isInitialized) {
-                    val currentModules = modules.map { it.dirId }
-                    if (moduleSizeCache.initializeCacheIfNeeded(currentModules)) {
-                        fetchModuleList()
-                    }
-                }
-
                 isNeedRefresh = false
             }.onFailure { e ->
                 Log.e(TAG, "fetchModuleList: ", e)
@@ -316,164 +290,6 @@ fun ModuleViewModel.ModuleInfo.copy(
         enabled, update, remove, updateJson, hasWebUi, hasActionScript, metamodule,
         dirId, config
     )
-}
-
-/**
- * 模块大小缓存管理器
- */
-class ModuleSizeCache(context: Context) {
-    companion object {
-        private const val TAG = "ModuleSizeCache"
-        private const val CACHE_PREFS_NAME = "module_size_cache"
-        private const val CACHE_VERSION_KEY = "cache_version"
-        private const val CACHE_INITIALIZED_KEY = "cache_initialized"
-        private const val CURRENT_CACHE_VERSION = 1
-    }
-
-    private val cachePrefs = context.getSharedPreferences(CACHE_PREFS_NAME, Context.MODE_PRIVATE)
-    private val sizeCache = mutableMapOf<String, Long>()
-
-    init {
-        loadCacheFromPrefs()
-    }
-
-    /**
-     * 从SharedPreferences加载缓存
-     */
-    private fun loadCacheFromPrefs() {
-        try {
-            val cacheVersion = cachePrefs.getInt(CACHE_VERSION_KEY, 0)
-            if (cacheVersion != CURRENT_CACHE_VERSION) {
-                Log.d(TAG, "缓存版本不匹配，清空缓存")
-                clearCache()
-                return
-            }
-
-            val allEntries = cachePrefs.all
-            for ((key, value) in allEntries) {
-                if (key != CACHE_VERSION_KEY && key != CACHE_INITIALIZED_KEY && value is Long) {
-                    sizeCache[key] = value
-                }
-            }
-            Log.d(TAG, "从缓存加载了 ${sizeCache.size} 个模块大小数据")
-        } catch (e: Exception) {
-            Log.e(TAG, "加载缓存失败", e)
-            clearCache()
-        }
-    }
-
-    /**
-     * 保存缓存到SharedPreferences
-     */
-    private fun saveCacheToPrefs() {
-        try {
-            cachePrefs.edit {
-                putInt(CACHE_VERSION_KEY, CURRENT_CACHE_VERSION)
-                putBoolean(CACHE_INITIALIZED_KEY, true)
-
-                for ((dirId, size) in sizeCache) {
-                    putLong(dirId, size)
-                }
-
-            }
-            Log.d(TAG, "保存了 ${sizeCache.size} 个模块大小到缓存")
-        } catch (e: Exception) {
-            Log.e(TAG, "保存缓存失败", e)
-        }
-    }
-
-    /**
-     * 获取模块大小（从缓存）
-     */
-    fun getModuleSize(dirId: String): Long {
-        return sizeCache[dirId] ?: 0L
-    }
-
-    /**
-     * 检查缓存是否已初始化，如果没有则初始化
-     * @return 是否有缓存更新
-     */
-    fun initializeCacheIfNeeded(currentModules: List<String>) : Boolean {
-        if (currentModules.isEmpty()) return false
-
-        val isInitialized = cachePrefs.getBoolean(CACHE_INITIALIZED_KEY, false)
-        if (!isInitialized || sizeCache.isEmpty()) {
-            Log.d(TAG, "首次初始化缓存，计算所有模块大小")
-            refreshCache(currentModules)
-            return true
-        } else {
-            // 检查是否有新模块需要计算大小
-            val newModules = currentModules.filter { !sizeCache.containsKey(it) }
-            if (newModules.isNotEmpty()) {
-                Log.d(TAG, "发现 ${newModules.size} 个新模块，计算大小: $newModules")
-                for (dirId in newModules) {
-                    val size = calculateModuleFolderSize(dirId)
-                    sizeCache[dirId] = size
-                    Log.d(TAG, "新模块 $dirId 大小: ${formatFileSize(size)}")
-                }
-                saveCacheToPrefs()
-                return true
-            }
-            return false
-        }
-    }
-
-    /**
-     * 刷新所有模块的大小缓存
-     */
-    fun refreshCache(currentModules: List<String>) {
-        try {
-            // 清理不存在的模块缓存
-            val toRemove = sizeCache.keys.filter { it !in currentModules }
-            toRemove.forEach { sizeCache.remove(it) }
-
-            if (toRemove.isNotEmpty()) {
-                Log.d(TAG, "清理了 ${toRemove.size} 个不存在的模块缓存: $toRemove")
-            }
-
-            // 计算所有当前模块的大小
-            for (dirId in currentModules) {
-                val size = calculateModuleFolderSize(dirId)
-                sizeCache[dirId] = size
-                Log.d(TAG, "更新模块 $dirId 大小: ${formatFileSize(size)}")
-            }
-
-            // 保存到持久化存储
-            saveCacheToPrefs()
-        } catch (e: Exception) {
-            Log.e(TAG, "刷新缓存失败", e)
-        }
-    }
-
-    /**
-     * 清空所有缓存
-     */
-    private fun clearCache() {
-        sizeCache.clear()
-        cachePrefs.edit { clear() }
-        Log.d(TAG, "清空所有缓存")
-    }
-
-    /**
-     * 实际计算模块文件夹大小
-     */
-    private fun calculateModuleFolderSize(dirId: String): Long {
-        return try {
-            val shell = getRootShell()
-            val command = "/data/adb/ksu/bin/busybox du -sb /data/adb/modules/$dirId"
-            val result = shell.newJob().add(command).to(ArrayList(), null).exec()
-
-            if (result.isSuccess && result.out.isNotEmpty()) {
-                val sizeStr = result.out.firstOrNull()?.split("\t")?.firstOrNull()
-                sizeStr?.toLongOrNull() ?: 0L
-            } else {
-                0L
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "计算模块大小失败 $dirId: ${e.message}")
-            0L
-        }
-    }
 }
 
 private fun JSONObject.getBooleanCompat(key: String, default: Boolean = false): Boolean {

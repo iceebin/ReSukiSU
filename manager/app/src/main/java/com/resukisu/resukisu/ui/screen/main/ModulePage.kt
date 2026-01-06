@@ -171,10 +171,6 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp) {
     val scope = rememberCoroutineScope()
     var lastClickTime by remember { mutableStateOf(0L) }
 
-    LaunchedEffect(Unit) {
-        viewModel.initializeCache(context)
-    }
-
     val bottomSheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true
     )
