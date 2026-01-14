@@ -613,14 +613,6 @@ err_free_handle:
 }
 
 static const struct input_device_id vol_detector_ids[] = {
-    // we add key volume up so that
-    // 1. if you have broken volume down you get shit
-    // 2. we can make sure to trigger only ksu safemode, not android's safemode.
-    {
-        .flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
-        .evbit = { BIT_MASK(EV_KEY) },
-        .keybit = { [BIT_WORD(KEY_VOLUMEUP)] = BIT_MASK(KEY_VOLUMEUP) },
-    },
     {
         .flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT,
         .evbit = { BIT_MASK(EV_KEY) },
