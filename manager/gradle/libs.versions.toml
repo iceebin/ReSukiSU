@@ -6,6 +6,7 @@ kotlin = "2.2.21"
 ksp = "2.2.21-2.0.4"
 m3color = "2025.4"
 haze = "1.7.1"
+capsule = "2.1.2"
 compose-bom = "2025.11.00"
 lifecycle = "2.9.4"
 navigation = "2.9.6"
@@ -50,6 +51,7 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 
 m3color = { module = "com.github.Kyant0:m3color", version.ref = "m3color" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+capsule = { module = "io.github.kyant0:capsule", version.ref = "capsule" }
 haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }

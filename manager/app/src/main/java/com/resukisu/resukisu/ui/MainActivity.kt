@@ -1,6 +1,7 @@
 package com.resukisu.resukisu.ui
 
 import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -34,6 +35,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.rememberNavController
@@ -42,6 +45,7 @@ import com.ramcosta.composedestinations.animations.NavHostAnimatedDestinationSty
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.annotation.RootGraph
 import com.ramcosta.composedestinations.generated.NavGraphs
+import com.ramcosta.composedestinations.generated.destinations.ExecuteModuleActionScreenDestination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.spec.NavHostGraphSpec
 import com.ramcosta.composedestinations.utils.rememberDestinationsNavigator
@@ -63,6 +67,8 @@ import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.install
 import com.resukisu.resukisu.ui.viewmodel.HomeViewModel
 import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
+import com.resukisu.resukisu.ui.webui.WebUIActivity
+import com.resukisu.resukisu.ui.webui.WebUIXActivity
 import com.resukisu.resukisu.ui.webui.initPlatform
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.Job
@@ -89,6 +95,8 @@ class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context?) {
         super.attachBaseContext(newBase?.let { LocaleHelper.applyLanguage(it) })
     }
+
+    private val intentState = MutableStateFlow(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         try {
@@ -190,6 +198,11 @@ class MainActivity : ComponentActivity() {
                         initPlatform()
                     }
 
+                    ShortcutIntentHandler(
+                        intentState = intentState,
+                        navigator = navigator
+                    )
+
                     CompositionLocalProvider(
                         LocalSnackbarHost provides snackBarHostState,
                     ) {
@@ -221,6 +234,13 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // Increment intentState to trigger LaunchedEffect re-execution
+        intentState.value += 1
     }
 
     private fun initializeViewModels() {
@@ -363,6 +383,53 @@ fun MainScreen(navigator: DestinationsNavigator, pageIndex: Int = 0) {
                 val destination = pages[it]
                 destination.direction(navigator, innerPadding.calculateBottomPadding(), hazeState)
             }
+        }
+    }
+}
+
+@Composable
+private fun ShortcutIntentHandler(
+    intentState: MutableStateFlow<Int>,
+    navigator: DestinationsNavigator
+) {
+    val activity = LocalActivity.current ?: return
+    val context = LocalContext.current
+    val intentStateValue by intentState.collectAsState()
+    LaunchedEffect(intentStateValue) {
+        val intent = activity.intent
+        val type = intent?.getStringExtra("shortcut_type") ?: return@LaunchedEffect
+        when (type) {
+            "module_action" -> {
+                val moduleId = intent.getStringExtra("module_id") ?: return@LaunchedEffect
+                navigator.navigate(ExecuteModuleActionScreenDestination(moduleId)) {
+                    launchSingleTop = true
+                }
+            }
+
+            "module_webui" -> {
+                val moduleId = intent.getStringExtra("module_id") ?: return@LaunchedEffect
+                val moduleName = intent.getStringExtra("module_name") ?: moduleId
+
+                val prefs = context.getSharedPreferences("settings", MODE_PRIVATE)
+                val globalEngine = prefs.getString("webui_engine", "default") ?: "default"
+                val selectedEngine = when (globalEngine) {
+                    "wx","default" -> Intent(context, WebUIXActivity::class.java)
+                    else -> Intent(context, WebUIActivity::class.java)
+                }
+
+                val webIntent = selectedEngine
+                    .setData("kernelsu://webui/$moduleId".toUri())
+                    .putExtra("id", moduleId)
+                    .putExtra("name", moduleName)
+                    .putExtra("from_webui_shortcut", true)
+                    .addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    )
+                context.startActivity(webIntent)
+            }
+
+            else -> return@LaunchedEffect
         }
     }
 }

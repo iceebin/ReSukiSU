@@ -142,6 +142,7 @@ dependencies {
     implementation(libs.m3color)
     implementation(libs.haze)
     implementation(libs.haze.materials)
+    implementation(libs.capsule)
 
     implementation(libs.dev.rikka.rikkax.parcelablelist)
 

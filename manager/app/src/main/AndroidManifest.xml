@@ -95,6 +95,7 @@
             android:name=".ui.webui.WebUIActivity"
             android:autoRemoveFromRecents="true"
             android:documentLaunchMode="intoExisting"
+            android:taskAffinity="${applicationId}.webui"
             android:exported="false"
             android:theme="@style/Theme.KernelSU.WebUI" />
 
@@ -102,6 +103,7 @@
             android:name=".ui.webui.WebUIXActivity"
             android:autoRemoveFromRecents="true"
             android:documentLaunchMode="intoExisting"
+            android:taskAffinity="${applicationId}.webui"
             android:exported="false"
             android:theme="@style/Theme.KernelSU.WebUI" />
 

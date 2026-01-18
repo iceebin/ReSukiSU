@@ -14,11 +14,17 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -43,8 +49,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Wysiwyg
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
@@ -55,6 +63,7 @@ import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
@@ -67,6 +76,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -75,6 +86,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -87,13 +99,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.FixedScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -113,6 +130,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dergoogler.mmrl.platform.Platform
 import com.dergoogler.mmrl.platform.model.ModuleConfig
 import com.dergoogler.mmrl.platform.model.ModuleConfig.Companion.asModuleConfig
+import com.kyant.capsule.ContinuousRoundedRectangle
 import com.ramcosta.composedestinations.generated.destinations.ExecuteModuleActionScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
 import com.ramcosta.composedestinations.generated.destinations.ModuleRepoScreenDestination
@@ -133,6 +151,7 @@ import com.resukisu.resukisu.ui.component.pinnedScrollBehavior
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberFabVisibilityState
 import com.resukisu.resukisu.ui.component.rememberLoadingDialog
+import com.resukisu.resukisu.ui.component.settings.SettingsTextFieldWidget
 import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.screen.LabelText
 import com.resukisu.resukisu.ui.theme.getCardColors
@@ -142,6 +161,7 @@ import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.download
 import com.resukisu.resukisu.ui.util.hasMagisk
 import com.resukisu.resukisu.ui.util.module.ModuleUtils
+import com.resukisu.resukisu.ui.util.module.Shortcut
 import com.resukisu.resukisu.ui.util.reboot
 import com.resukisu.resukisu.ui.util.toggleModule
 import com.resukisu.resukisu.ui.util.undoUninstallModule
@@ -157,6 +177,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
+
+private enum class ShortcutType {
+    Action,
+    WebUI
+}
 
 /**
  * @author ShirkNeko
@@ -689,6 +714,102 @@ private fun ModuleList(
     val loadingDialog = rememberLoadingDialog()
     val confirmDialog = rememberConfirmDialog()
 
+    var shortcutModuleId by rememberSaveable { mutableStateOf<String?>(null) }
+    val textFieldState = rememberTextFieldState()
+    var shortcutIconUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var defaultShortcutIconUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var defaultActionShortcutIconUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var defaultWebUiShortcutIconUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedShortcutType by rememberSaveable { mutableStateOf<ShortcutType?>(null) }
+    val showShortcutDialog = remember { mutableStateOf(false) }
+    val showShortcutTypeRow = remember { mutableStateOf(false) }
+
+    fun openShortcutDialogForType(type: ShortcutType) {
+        selectedShortcutType = type
+        val defaultIcon = when (type) {
+            ShortcutType.Action -> defaultActionShortcutIconUri ?: defaultWebUiShortcutIconUri
+            ShortcutType.WebUI -> defaultWebUiShortcutIconUri ?: defaultActionShortcutIconUri
+        }
+        defaultShortcutIconUri = defaultIcon
+        shortcutIconUri = defaultIcon
+        showShortcutDialog.value = true
+    }
+
+    fun hasModuleShortcut(context: Context, moduleId: String, type: ShortcutType): Boolean {
+        return when (type) {
+            ShortcutType.Action -> Shortcut.hasModuleActionShortcut(context, moduleId)
+            ShortcutType.WebUI -> Shortcut.hasModuleWebUiShortcut(context, moduleId)
+        }
+    }
+
+    fun deleteModuleShortcut(context: Context, moduleId: String, type: ShortcutType) {
+        when (type) {
+            ShortcutType.Action -> Shortcut.deleteModuleActionShortcut(context, moduleId)
+            ShortcutType.WebUI -> Shortcut.deleteModuleWebUiShortcut(context, moduleId)
+        }
+    }
+
+    fun createModuleShortcut(
+        context: Context,
+        moduleId: String,
+        name: String,
+        iconUri: String?,
+        type: ShortcutType
+    ) {
+        when (type) {
+            ShortcutType.Action -> {
+                Shortcut.createModuleActionShortcut(
+                    context = context,
+                    moduleId = moduleId,
+                    name = name,
+                    iconUri = iconUri
+                )
+            }
+
+            ShortcutType.WebUI -> {
+                Shortcut.createModuleWebUiShortcut(
+                    context = context,
+                    moduleId = moduleId,
+                    name = name,
+                    iconUri = iconUri
+                )
+            }
+        }
+    }
+
+    val pickShortcutIconLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        shortcutIconUri = uri?.toString()
+    }
+
+    val shortcutPreviewIcon = remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(shortcutIconUri) {
+        val uriStr = shortcutIconUri
+        if (uriStr.isNullOrBlank()) {
+            shortcutPreviewIcon.value = null
+            return@LaunchedEffect
+        }
+        val bitmap = withContext(Dispatchers.IO) {
+            Shortcut.loadShortcutBitmap(context, uriStr)
+        }
+        shortcutPreviewIcon.value = bitmap?.asImageBitmap()
+    }
+
+    var hasExistingShortcut by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(shortcutModuleId, selectedShortcutType, showShortcutDialog.value) {
+        val moduleId = shortcutModuleId
+        val type = selectedShortcutType
+        if (!showShortcutDialog.value || moduleId.isNullOrBlank() || type == null) {
+            hasExistingShortcut = false
+            return@LaunchedEffect
+        }
+        val exists = withContext(Dispatchers.IO) {
+            hasModuleShortcut(context, moduleId, type)
+        }
+        hasExistingShortcut = exists
+    }
+
     suspend fun onModuleUpdate(
         module: ModuleViewModel.ModuleInfo,
         changelogUrl: String,
@@ -783,6 +904,8 @@ private fun ModuleList(
         val success = loadingDialog.withLoading {
             withContext(Dispatchers.IO) {
                 if (isUninstall) {
+                    Shortcut.deleteModuleActionShortcut(context, module.id)
+                    Shortcut.deleteModuleWebUiShortcut(context, module.id)
                     uninstallModule(module.dirId)
                 } else {
                     undoUninstallModule(module.dirId)
@@ -815,6 +938,30 @@ private fun ModuleList(
         }
     }
 
+    fun onModuleAddShortcut(module: ModuleViewModel.ModuleInfo) {
+        shortcutModuleId = module.id
+        textFieldState.edit {
+            replace(0, length, module.name)
+        }
+        shortcutIconUri = null
+        defaultShortcutIconUri = null
+        defaultActionShortcutIconUri = module.actionIconPath
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "su:$it" }
+        defaultWebUiShortcutIconUri = module.webUiIconPath
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "su:$it" }
+        if (module.hasActionScript && module.hasWebUi) {
+            selectedShortcutType = null
+            showShortcutTypeRow.value = true
+            openShortcutDialogForType(ShortcutType.Action)
+        } else if (module.hasActionScript) {
+            openShortcutDialogForType(ShortcutType.Action)
+        } else if (module.hasWebUi) {
+            openShortcutDialogForType(ShortcutType.WebUI)
+        }
+    }
+
     var pullToRefreshBoxModifier = boxModifier
 
     pullToRefreshBoxModifier = if (hazeState != null) pullToRefreshBoxModifier.hazeSource(state = hazeState) else pullToRefreshBoxModifier
@@ -827,7 +974,9 @@ private fun ModuleList(
         modifier = pullToRefreshBoxModifier.fillMaxSize(),
         indicator = {
             PullToRefreshDefaults.LoadingIndicator(
-                modifier = Modifier.padding(top = topPadding).align(Alignment.TopCenter),
+                modifier = Modifier
+                    .padding(top = topPadding)
+                    .align(Alignment.TopCenter),
                 state = pullRefreshState,
                 isRefreshing = viewModel.isRefreshing,
             )
@@ -944,6 +1093,9 @@ private fun ModuleList(
                             },
                             onClick = {
                                 onClickModule(it.dirId, it.name, it.hasWebUi)
+                            },
+                            onModuleAddShortcut = {
+                                onModuleAddShortcut(it)
                             }
                         )
 
@@ -959,6 +1111,176 @@ private fun ModuleList(
 
         DownloadListener(context, onInstallModule)
     }
+
+    if (showShortcutDialog.value) {
+        ModalBottomSheet(
+            sheetState = rememberModalBottomSheetState(
+                skipPartiallyExpanded = true
+            ),
+            onDismissRequest = {
+                showShortcutDialog.value = false
+                showShortcutTypeRow.value = false
+            }
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.module_shortcut_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 16.dp)
+                )
+                if (showShortcutTypeRow.value) {
+                    PrimaryTabRow(
+                        selectedTabIndex = selectedShortcutType?.ordinal ?: 0,
+                        containerColor = Color.Transparent,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Tab(
+                            selected = selectedShortcutType == ShortcutType.Action,
+                            onClick = {
+                                selectedShortcutType = ShortcutType.Action
+                                shortcutIconUri = defaultActionShortcutIconUri
+                                defaultShortcutIconUri = defaultActionShortcutIconUri
+                            },
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = { Text("Action") }
+                        )
+
+                        Tab(
+                            selected = selectedShortcutType == ShortcutType.WebUI,
+                            onClick = {
+                                selectedShortcutType = ShortcutType.WebUI
+                                shortcutIconUri = defaultWebUiShortcutIconUri
+                                defaultShortcutIconUri = defaultWebUiShortcutIconUri
+                            },
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = { Text("WebUI") }
+                        )
+                    }
+                }
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .padding(vertical = 16.dp)
+                        .size(100.dp)
+                        .clip(ContinuousRoundedRectangle(25.dp))
+                ) {
+                    val preview = shortcutPreviewIcon.value
+                    if (preview != null) {
+                        Image(
+                            bitmap = preview,
+                            modifier = Modifier.size(100.dp),
+                            contentDescription = null,
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .background(Color.White)
+                        )
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = null,
+                            contentScale = FixedScale(1.5f)
+                        )
+                    }
+                }
+                Row {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { pickShortcutIconLauncher.launch("image/*") },
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.module_shortcut_icon_pick)
+                        )
+                    }
+                    AnimatedVisibility(
+                        visible = shortcutIconUri != defaultShortcutIconUri,
+                        enter = expandHorizontally() + slideInHorizontally(initialOffsetX = { it }),
+                        exit = shrinkHorizontally() + slideOutHorizontally(targetOffsetX = { it }),
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                    ) {
+                        IconButton(
+                            onClick = { shortcutIconUri = defaultShortcutIconUri },
+                            modifier = Modifier.padding(start = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Undo,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+                    }
+                }
+                SettingsTextFieldWidget(
+                    state = textFieldState,
+                    title = stringResource(id = R.string.module_shortcut_name_label)
+                )
+                if (hasExistingShortcut) {
+                    OutlinedButton(
+                        onClick = {
+                            val moduleId = shortcutModuleId
+                            val type = selectedShortcutType
+                            if (!moduleId.isNullOrBlank() && type != null) {
+                                deleteModuleShortcut(context, moduleId, type)
+                            }
+                            showShortcutDialog.value = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.module_shortcut_delete),
+                        )
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showShortcutDialog.value = false },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = stringResource(id = android.R.string.cancel),
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val moduleId = shortcutModuleId
+                            val type = selectedShortcutType
+                            if (!moduleId.isNullOrBlank() && textFieldState.text.isNotBlank() && type != null) {
+                                createModuleShortcut(
+                                    context = context,
+                                    moduleId = moduleId,
+                                    name = textFieldState.text.toString(),
+                                    iconUri = shortcutIconUri,
+                                    type = type
+                                )
+                            }
+                            showShortcutDialog.value = false
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = if (hasExistingShortcut) {
+                                stringResource(id = R.string.module_update)
+                            } else {
+                                stringResource(id = android.R.string.ok)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -969,7 +1291,8 @@ fun ModuleItem(
     onUninstallClicked: (ModuleViewModel.ModuleInfo) -> Unit,
     onCheckChanged: (Boolean) -> Unit,
     onUpdate: (ModuleViewModel.ModuleInfo) -> Unit,
-    onClick: (ModuleViewModel.ModuleInfo) -> Unit
+    onClick: (ModuleViewModel.ModuleInfo) -> Unit,
+    onModuleAddShortcut: (ModuleViewModel.ModuleInfo) -> Unit,
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("settings", MODE_PRIVATE)
@@ -1205,6 +1528,22 @@ fun ModuleItem(
                     }
                 }
 
+                if (module.hasActionScript || module.hasWebUi) {
+                    FilledTonalButton(
+                        modifier = Modifier.defaultMinSize(minWidth = 52.dp, minHeight = 32.dp),
+                        enabled = !module.remove && module.enabled,
+                        onClick = { onModuleAddShortcut(module) },
+                        interactionSource = interactionSource,
+                        contentPadding = ButtonDefaults.TextButtonContentPadding,
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(20.dp),
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = stringResource(R.string.module_shortcut_add)
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.weight(1f, true))
 
                 if (updateUrl.isNotEmpty()) {
@@ -1236,7 +1575,9 @@ fun ModuleItem(
                         )
                     } else {
                         Icon(
-                            modifier = Modifier.size(20.dp).rotate(180f),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .rotate(180f),
                             imageVector = Icons.Outlined.Refresh,
                             contentDescription = null
                         )
@@ -1264,8 +1605,10 @@ fun ModuleItemPreview() {
         hasWebUi = true,
         hasActionScript = true,
         metamodule = true,
+        actionIconPath = null,
+        webUiIconPath = null,
         dirId = "dirId",
         config = ModuleConfig()
     )
-    ModuleItem(EmptyDestinationsNavigator, module, "", {}, {}, {}, {})
+    ModuleItem(EmptyDestinationsNavigator, module, "", {}, {}, {}, {}, {})
 }
