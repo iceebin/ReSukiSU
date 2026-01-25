@@ -8,7 +8,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.dergoogler.mmrl.platform.Platform
 import com.dergoogler.mmrl.platform.model.ModId
@@ -17,30 +21,13 @@ import com.dergoogler.mmrl.webui.model.WebUIConfig
 import com.dergoogler.mmrl.webui.screen.WebUIScreen
 import com.dergoogler.mmrl.webui.util.rememberWebUIOptions
 import com.resukisu.resukisu.BuildConfig
+import com.resukisu.resukisu.ksuApp
 import com.resukisu.resukisu.ui.theme.KernelSUTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class WebUIXActivity : ComponentActivity() {
     private lateinit var webView: WebView
-
-    private val userAgent
-        get(): String {
-            val ksuVersion = BuildConfig.VERSION_CODE
-
-            val platform = Platform.get("Unknown") {
-                platform.name
-            }
-
-            val platformVersion = Platform.get(-1) {
-                moduleManager.versionCode
-            }
-
-            val osVersion = Build.VERSION.RELEASE
-            val deviceModel = Build.MODEL
-
-            return "SukiSU-Ultra /$ksuVersion (Linux; Android $osVersion; $deviceModel; $platform/$platformVersion)"
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,10 +43,10 @@ class WebUIXActivity : ComponentActivity() {
         val name = intent.getStringExtra("name")!!
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             @Suppress("DEPRECATION")
-            setTaskDescription(ActivityManager.TaskDescription("SukiSU-Ultra - $name"))
+            setTaskDescription(ActivityManager.TaskDescription("ReSukiSU - $name"))
         } else {
             val taskDescription =
-                ActivityManager.TaskDescription.Builder().setLabel("SukiSU-Ultra - $name").build()
+                ActivityManager.TaskDescription.Builder().setLabel("ReSukiSU - $name").build()
             setTaskDescription(taskDescription)
         }
 
@@ -93,7 +80,7 @@ class WebUIXActivity : ComponentActivity() {
                     isDarkMode = dark,
                     enableEruda = erudaInject,
                     cls = WebUIXActivity::class.java,
-                    userAgentString = userAgent
+                    userAgentString = ksuApp.UserAgent
                 )
 
                 // idk why webuix not allow root impl change webuiConfig

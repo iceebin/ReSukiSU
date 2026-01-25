@@ -101,10 +101,10 @@ class WebUIActivity : ComponentActivity() {
         val name = intent.getStringExtra("name") ?: finishAndRemoveTask().let { return }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             @Suppress("DEPRECATION")
-            setTaskDescription(ActivityManager.TaskDescription("SukiSU-Ultra - $name"))
+            setTaskDescription(ActivityManager.TaskDescription("ReSukiSU - $name"))
         } else {
             val taskDescription =
-                ActivityManager.TaskDescription.Builder().setLabel("SukiSU-Ultra - $name").build()
+                ActivityManager.TaskDescription.Builder().setLabel("ReSukiSU - $name").build()
             setTaskDescription(taskDescription)
         }
 
