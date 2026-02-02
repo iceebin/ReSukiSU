@@ -96,6 +96,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -499,6 +500,7 @@ private fun SuperUserBottomSheet(
                 icon = Icons.Filled.Refresh,
                 titleRes = R.string.refresh,
                 onClick = {
+                    viewModel.viewModelScope.launch { viewModel.fetchAppList() }
                 }
             ),
             BottomSheetMenuItem(
