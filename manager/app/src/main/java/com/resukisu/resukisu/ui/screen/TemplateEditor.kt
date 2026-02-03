@@ -1,7 +1,6 @@
 package com.resukisu.resukisu.ui.screen
 
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -83,10 +82,6 @@ fun TemplateEditorScreen(
 
     val scrollBehavior =
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
-    BackHandler {
-        navigator.navigateBack(result = !readOnly)
-    }
 
     Scaffold(
         topBar = {
