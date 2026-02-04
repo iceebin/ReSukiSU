@@ -194,6 +194,12 @@ fun SearchAppBar(
         isExpanded = false
     }
 
+    BackHandler(!isExpanded && textFieldState.text.isNotEmpty()) {
+        textFieldState.edit {
+            replace(0, length, "")
+        }
+    }
+
     LaunchedEffect(textFieldState.text) {
         onSearchTextChange(textFieldState.text.toString())
     }

@@ -1,5 +1,6 @@
 package com.resukisu.resukisu.ui.screen.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -891,6 +892,10 @@ private fun AppGroupItem(
                         onCheckedChange = { onToggleSelection() },
                         interactionSource = checkboxInteractionSource,
                     )
+                }
+
+                BackHandler {
+                    viewModel.showBatchActions = false
                 }
             } else {
                 Icon(

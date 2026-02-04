@@ -1,5 +1,6 @@
 package com.resukisu.resukisu.ui.screen.moduleRepo
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -202,6 +203,14 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
                             unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             text = { Text(title) }
                         )
+                    }
+                }
+
+                BackHandler(
+                    pagerState.currentPage != 0
+                ) {
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(0)
                     }
                 }
             }
