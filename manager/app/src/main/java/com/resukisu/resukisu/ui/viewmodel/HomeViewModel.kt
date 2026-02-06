@@ -13,6 +13,7 @@ import com.resukisu.resukisu.KernelVersion
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.getKernelVersion
 import com.resukisu.resukisu.ksuApp
+import com.resukisu.resukisu.ui.susfs.util.SuSFSManager
 import com.resukisu.resukisu.ui.util.checkNewVersion
 import com.resukisu.resukisu.ui.util.getKpmModuleCount
 import com.resukisu.resukisu.ui.util.getKpmVersion
@@ -53,9 +54,9 @@ class HomeViewModel : ViewModel() {
         val managerVersion: Pair<String, Long> = Pair("", 0L),
         val selinuxStatus: String = "",
         val kpmVersion: String = "",
-        val susfsStatus: String = "",
+        val susfsEnabled: Boolean = false,
+        val susfsVersionSupported: Boolean = false,
         val susfsVersion: String = "",
-        val susfsVariant: String = "",
         val susfsFeatures: String = "",
         val superuserCount: Int = 0,
         val moduleCount: Int = 0,
@@ -228,12 +229,14 @@ class HomeViewModel : ViewModel() {
                 }
 
                 if (!isHideSusfsStatus) {
-                    val suSFSInfo = loadSuSFSInfo()
+                    val susfsInfo = loadSuSFSInfo()
                     systemInfo = systemInfo.copy(
-                        susfsStatus = suSFSInfo.first,
-                        susfsVersion = suSFSInfo.second,
-                        susfsVariant = suSFSInfo.third,
-                        susfsFeatures = suSFSInfo.fourth,
+                        susfsEnabled = susfsInfo.first,
+                        susfsVersionSupported = susfsInfo.first && SuSFSManager.isBinaryAvailable(
+                            context
+                        ), // enabled & have binary
+                        susfsVersion = susfsInfo.second,
+                        susfsFeatures = susfsInfo.third,
                     )
                 }
 
@@ -375,39 +378,35 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private suspend fun loadSuSFSInfo(): Tuple4<String, String, String, String> {
+    private suspend fun loadSuSFSInfo(): Triple<Boolean, String, String> {
         return withContext(Dispatchers.IO) {
-            val suSFS = try {
-                if (getSuSFSStatus().equals("true", ignoreCase = true)) {
-                    "Supported"
-                } else {
-                    "Unsupported"
-                }
+            val susfsEnabled = try {
+                getSuSFSStatus().equals("true", ignoreCase = true)
             } catch (_: Exception) {
-                "Unknown"
+                false
             }
 
-            if (suSFS != "Supported") {
-                return@withContext Tuple4(suSFS, "", "", "")
+            if (!susfsEnabled) {
+                return@withContext Triple(false, "", "")
             }
 
-            val suSFSVersion = try {
+            val susfsVersion = try {
                 getSuSFSVersion()
             } catch (_: Exception) {
                 ""
             }
 
-            if (suSFSVersion.isEmpty()) {
-                return@withContext Tuple4(suSFS, "", "", "")
+            if (susfsVersion.isEmpty()) {
+                return@withContext Triple(true, "", "")
             }
 
-            val suSFSFeatures = try {
+            val susfsFeatures = try {
                 getSuSFSFeatures()
             } catch (_: Exception) {
                 ""
             }
 
-            Tuple4(suSFS, suSFSVersion, "", suSFSFeatures)
+            Triple(true, susfsVersion, susfsFeatures)
         }
     }
 

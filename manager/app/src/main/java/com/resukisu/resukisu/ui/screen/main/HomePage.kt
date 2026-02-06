@@ -102,14 +102,12 @@ import com.resukisu.resukisu.ui.component.KsuIsValid
 import com.resukisu.resukisu.ui.component.WarningCard
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.screen.LabelText
-import com.resukisu.resukisu.ui.susfs.util.SuSFSManager
 import com.resukisu.resukisu.ui.theme.CardConfig.cardElevation
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.theme.getCardColors
 import com.resukisu.resukisu.ui.theme.getCardElevation
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.checkNewVersion
-import com.resukisu.resukisu.ui.util.getSuSFSStatus
 import com.resukisu.resukisu.ui.util.module.LatestVersionInfo
 import com.resukisu.resukisu.ui.util.reboot
 import com.resukisu.resukisu.ui.viewmodel.HomeViewModel
@@ -154,9 +152,9 @@ fun HomePage(
     Scaffold(
         topBar = {
             TopBar(
+                viewModel = viewModel,
                 scrollBehavior = scrollBehavior,
                 navigator = navigator,
-                isDataLoaded = viewModel.isCoreDataLoaded,
                 hazeState = hazeState
             )
         },
@@ -343,12 +341,12 @@ fun RebootDropdownItem(@StringRes id: Int, reason: String = "") {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TopBar(
+    viewModel: HomeViewModel,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     navigator: DestinationsNavigator,
-    isDataLoaded: Boolean = false,
     hazeState: HazeState? = null
 ) {
-    val context = LocalContext.current
+    LocalContext.current
 
     val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
         backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
@@ -384,9 +382,9 @@ private fun TopBar(
                 else MaterialTheme.colorScheme.surfaceContainer,
         ),
         actions = {
-            if (isDataLoaded) {
+            if (viewModel.isCoreDataLoaded) {
                 // SuSFS 配置按钮
-                if (getSuSFSStatus().equals("true", ignoreCase = true) && SuSFSManager.isBinaryAvailable(context)) {
+                if (viewModel.systemInfo.susfsVersionSupported) {
                     IconButton(onClick = {
                         navigator.navigate(SuSFSConfigScreenDestination)
                     }) {
@@ -743,8 +741,7 @@ private fun InfoCard(
                 icon = Icons.Default.SettingsSuggest,
             )
 
-            if (!isSimpleMode &&
-                (systemInfo.susfsStatus != "Supported")) {
+            if (!isSimpleMode && !systemInfo.susfsEnabled) {
                 InfoCardItem(
                     stringResource(R.string.home_hook_type),
                     Natives.getHookType(),
@@ -836,7 +833,7 @@ private fun InfoCard(
                 )
             }
 
-            if (!isSimpleMode && !isHideSusfsStatus && systemInfo.susfsStatus == "Supported" && systemInfo.susfsVersion.isNotEmpty()) {
+            if (!isSimpleMode && !isHideSusfsStatus && systemInfo.susfsEnabled && systemInfo.susfsVersion.isNotEmpty()) {
                 val infoText = SuSFSInfoText(systemInfo)
 
                 InfoCardItem(

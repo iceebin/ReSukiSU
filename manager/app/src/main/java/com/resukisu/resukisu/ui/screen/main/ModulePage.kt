@@ -133,7 +133,6 @@ import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ksuApp
-import com.resukisu.resukisu.ui.component.AnimatedFab
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.InstallConfirmationDialog
 import com.resukisu.resukisu.ui.component.SearchAppBar
@@ -143,7 +142,6 @@ import com.resukisu.resukisu.ui.component.ZipFileInfo
 import com.resukisu.resukisu.ui.component.ZipType
 import com.resukisu.resukisu.ui.component.pinnedScrollBehavior
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
-import com.resukisu.resukisu.ui.component.rememberFabVisibilityState
 import com.resukisu.resukisu.ui.component.rememberLoadingDialog
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsJumpPageWidget
@@ -200,7 +198,6 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: H
     )
     var showBottomSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val fabVisible by rememberFabVisibilityState(listState)
 
     var showConfirmationDialog by remember { mutableStateOf(false) }
     var pendingZipFiles by remember { mutableStateOf<List<ZipFileInfo>>(emptyList()) }
@@ -334,29 +331,27 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: H
             )
         },
         floatingActionButton = {
-            AnimatedFab(
-                visible = !hideInstallButton && fabVisible,
-                modifier = Modifier.padding(bottom = bottomPadding)
-            ) {
-                FloatingActionButton(
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    onClick = {
-                        selectZipLauncher.launch(
-                            Intent(Intent.ACTION_GET_CONTENT).apply {
-                                type = "application/zip"
-                                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                            }
-                        )
-                    },
-                    content = {
-                        Icon(
-                            painter = painterResource(id = R.drawable.package_import),
-                            contentDescription = null
-                        )
-                    }
-                )
-            }
+            if (hideInstallButton) return@Scaffold
+
+            FloatingActionButton(
+                modifier = Modifier.padding(bottom = bottomPadding),
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = MaterialTheme.colorScheme.primary,
+                onClick = {
+                    selectZipLauncher.launch(
+                        Intent(Intent.ACTION_GET_CONTENT).apply {
+                            type = "application/zip"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
+                    )
+                },
+                content = {
+                    Icon(
+                        painter = painterResource(id = R.drawable.package_import),
+                        contentDescription = null
+                    )
+                }
+            )
         },
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -365,9 +360,6 @@ fun ModulePage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: H
         ),
         snackbarHost = {
             SnackbarHost(
-                modifier = if (!fabVisible) {
-                    Modifier.padding(bottom = bottomPadding)
-                } else Modifier,
                 hostState = snackBarHost
             )
         }
@@ -988,7 +980,7 @@ private fun ModuleList(
                     start = 16.dp,
                     top = 16.dp,
                     end = 16.dp,
-                    bottom = 16.dp + 56.dp + 16.dp + 48.dp + 6.dp /* Scaffold Fab Spacing + Fab container height + SnackBar height */
+                    bottom = 65.dp
                 )
             },
         ) {
@@ -1042,7 +1034,7 @@ private fun ModuleList(
                             viewModel = viewModel,
                             navigator = navigator,
                             module = module,
-                            updateUrl = module.moduleUpdate?.first.orEmpty(),
+                            updateUrl = module.moduleUpdate?.zipUrl.orEmpty(),
                             onUninstallClicked = {
                                 viewModel.viewModelScope.launch {
                                     withContext(Dispatchers.IO) {
@@ -1080,9 +1072,9 @@ private fun ModuleList(
                                     withContext(Dispatchers.IO) {
                                         onModuleUpdate(
                                             module,
-                                            module.moduleUpdate!!.third,
-                                            module.moduleUpdate!!.first,
-                                            "${module.name}-${module.moduleUpdate!!.second}.zip"
+                                            module.moduleUpdate!!.changelog,
+                                            module.moduleUpdate.zipUrl,
+                                            "${module.name}-${module.moduleUpdate.version}.zip"
                                         )
                                     }
                                 }
@@ -1621,7 +1613,8 @@ fun ModuleItemPreview() {
         metamodule = true,
         actionIconPath = null,
         webUiIconPath = null,
-        dirId = "dirId"
+        dirId = "dirId",
+        moduleUpdate = null
     )
     ModuleItem(
         viewModel<ModuleViewModel>(),

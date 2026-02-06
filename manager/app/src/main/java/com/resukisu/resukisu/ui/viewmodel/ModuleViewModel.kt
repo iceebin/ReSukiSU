@@ -60,8 +60,14 @@ class ModuleViewModel : ViewModel() {
         }
     }
 
+    data class ModuleUpdateInfo(
+        val zipUrl: String,
+        val version: String,
+        val changelog: String
+    )
+
     @Stable
-    class ModuleInfo(
+    data class ModuleInfo(
         val id: String,
         val name: String,
         val author: String,
@@ -78,9 +84,8 @@ class ModuleViewModel : ViewModel() {
         val actionIconPath: String?,
         val webUiIconPath: String?,
         val dirId: String, // real module id (dir name)
-    ) {
-        var moduleUpdate by mutableStateOf<Triple<String, String, String>?>(null)
-    }
+        val moduleUpdate: ModuleUpdateInfo?
+    )
 
     var isRefreshing by mutableStateOf(false)
         private set
@@ -143,31 +148,6 @@ class ModuleViewModel : ViewModel() {
 
                 Log.i(TAG, "result: $result")
 
-                val array = JSONArray(result)
-                modules = (0 until array.length())
-                    .asSequence()
-                    .map { array.getJSONObject(it) }
-                    .map { obj ->
-                        ModuleInfo(
-                            obj.getString("id"),
-                            obj.optString("name"),
-                            obj.optString("author", "Unknown"),
-                            obj.optString("version", "Unknown"),
-                            obj.getIntCompat("versionCode", 0),
-                            obj.optString("description"),
-                            obj.getBooleanCompat("enabled"),
-                            obj.getBooleanCompat("update"),
-                            obj.getBooleanCompat("remove"),
-                            obj.optString("updateJson"),
-                            obj.getBooleanCompat("web"),
-                            obj.getBooleanCompat("action"),
-                            obj.getBooleanCompat("metamodule"),
-                            obj.optString("actionIcon").takeIf { it.isNotBlank() },
-                            obj.optString("webuiIcon").takeIf { it.isNotBlank() },
-                            obj.optString("dir_id", obj.getString("id")),
-                        )
-                    }.toList()
-
                 val moduleList = mutableListOf<String>()
                 if (!manualRefresh) {
                     oldModuleList.forEach { module ->
@@ -175,10 +155,41 @@ class ModuleViewModel : ViewModel() {
                     }
                 }
 
-                modules.forEach { module ->
-                    if (!moduleList.contains(module.id + module.versionCode))
-                        module.moduleUpdate = checkUpdate(module)
-                }
+                val array = JSONArray(result)
+                modules = (0 until array.length())
+                    .asSequence()
+                    .map { array.getJSONObject(it) }
+                    .map { obj ->
+                        val moduleId = obj.getString("id")
+                        val moduleVersionCode = obj.getIntCompat("versionCode", 0)
+                        val enabled = obj.getBooleanCompat("enabled")
+                        val update = obj.getBooleanCompat("update")
+                        val remove = obj.getBooleanCompat("remove")
+                        val updateJson = obj.optString("updateJson")
+
+                        ModuleInfo(
+                            id = moduleId,
+                            name = obj.optString("name"),
+                            author = obj.optString("author", "Unknown"),
+                            version = obj.optString("version", "Unknown"),
+                            versionCode = moduleVersionCode,
+                            description = obj.optString("description"),
+                            enabled = enabled,
+                            update = update,
+                            remove = remove,
+                            updateJson = updateJson,
+                            hasWebUi = obj.getBooleanCompat("web"),
+                            hasActionScript = obj.getBooleanCompat("action"),
+                            metamodule = obj.getBooleanCompat("metamodule"),
+                            actionIconPath = obj.optString("actionIcon").takeIf { it.isNotBlank() },
+                            webUiIconPath = obj.optString("webuiIcon").takeIf { it.isNotBlank() },
+                            dirId = obj.optString("dir_id", obj.getString("id")),
+                            moduleUpdate = if (!moduleList.contains(moduleId + moduleVersionCode) || updateJson.isEmpty() || remove || update || !enabled)
+                                checkUpdate(updateJson, moduleVersionCode)
+                            else
+                                null
+                        )
+                    }.toList()
 
                 isNeedRefresh = false
             }.onFailure { e ->
@@ -200,20 +211,18 @@ class ModuleViewModel : ViewModel() {
         return version.replace(Regex("[^a-zA-Z0-9.\\-_]"), "_")
     }
 
-    fun checkUpdate(m: ModuleInfo): Triple<String, String, String> {
-        val empty = Triple("", "", "")
+    fun checkUpdate(updateUrl: String, versionCode: Int): ModuleUpdateInfo? {
         val isCheckUpdateEnabled = ksuApp.getSharedPreferences("settings", Context.MODE_PRIVATE)
             .getBoolean("check_update", true)
-        if (!isCheckUpdateEnabled || m.updateJson.isEmpty() || m.remove || m.update || !m.enabled) {
-            return empty
+        if (!isCheckUpdateEnabled) {
+            return null
         }
         // download updateJson
         val result = kotlin.runCatching {
-            val url = m.updateJson
-            Log.i(TAG, "checkUpdate url: $url")
+            Log.i(TAG, "checkUpdate url: $updateUrl")
 
             val request = okhttp3.Request.Builder()
-                .url(url)
+                .url(updateUrl)
                 .build()
 
             val response = ksuApp.okhttpClient.newCall(request).execute()
@@ -233,23 +242,23 @@ class ModuleViewModel : ViewModel() {
         Log.i(TAG, "checkUpdate result: $result")
 
         if (result.isEmpty()) {
-            return empty
+            return null
         }
 
         val updateJson = kotlin.runCatching {
             JSONObject(result)
-        }.getOrNull() ?: return empty
+        }.getOrNull() ?: return null
 
         var version = updateJson.optString("version", "")
         version = sanitizeVersionString(version)
-        val versionCode = updateJson.optInt("versionCode", 0)
+        val onlineVersionCode = updateJson.optInt("versionCode", 0)
         val zipUrl = updateJson.optString("zipUrl", "")
         val changelog = updateJson.optString("changelog", "")
-        if (versionCode <= m.versionCode || zipUrl.isEmpty()) {
-            return empty
+        if (onlineVersionCode <= versionCode || zipUrl.isEmpty()) {
+            return null
         }
 
-        return Triple(zipUrl, version, changelog)
+        return ModuleUpdateInfo(zipUrl, version, changelog)
     }
 }
 
@@ -267,14 +276,15 @@ fun ModuleViewModel.ModuleInfo.copy(
     hasWebUi: Boolean = this.hasWebUi,
     hasActionScript: Boolean = this.hasActionScript,
     metamodule: Boolean = this.metamodule,
-    actionIconPath: String?,
-    webUiIconPath: String?,
+    actionIconPath: String? = this.actionIconPath,
+    webUiIconPath: String? = this.webUiIconPath,
     dirId: String = this.dirId,
+    moduleUpdate: ModuleViewModel.ModuleUpdateInfo? = this.moduleUpdate,
 ): ModuleViewModel.ModuleInfo {
     return ModuleViewModel.ModuleInfo(
         id, name, author, version, versionCode, description,
         enabled, update, remove, updateJson, hasWebUi, hasActionScript, metamodule,
-        actionIconPath, webUiIconPath, dirId
+        actionIconPath, webUiIconPath, dirId, moduleUpdate
     )
 }
 

@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -408,78 +409,88 @@ private fun SuperUserContent(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = remember {
+                PaddingValues(
+                    start = 0.dp,
+                    top = 0.dp,
+                    end = 0.dp,
+                    bottom = 85.dp
+                )
+            },
         ) {
             item {
                 Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding() + 5.dp))
             }
-            filteredAndSortedAppGroups.forEachIndexed { appGroupIndex, appGroup ->
-                item(key = "${appGroup.uid}-${appGroup.mainApp.packageName}") {
-                    val isFirst = appGroupIndex == 0
-                    val isLast = appGroupIndex == filteredAndSortedAppGroups.size - 1
+            itemsIndexed(
+                items = filteredAndSortedAppGroups,
+                key = { _, appGroup -> "${appGroup.uid}-${appGroup.mainApp.packageName}" },
+                contentType = { _, _ -> "AppGroupItem" }
+            ) { appGroupIndex, appGroup ->
+                val isFirst = appGroupIndex == 0
+                val isLast = appGroupIndex == filteredAndSortedAppGroups.size - 1
 
-                    val targetTopRadius = if (isFirst) cornerRadius else connectionRadius
-                    val targetBottomRadius = if (isLast) cornerRadius else connectionRadius
+                val targetTopRadius = if (isFirst) cornerRadius else connectionRadius
+                val targetBottomRadius = if (isLast) cornerRadius else connectionRadius
 
-                    val animatedTopRadius by animateDpAsState(
-                        targetValue = targetTopRadius,
-                        animationSpec = spring(stiffness = sharedStiffness),
-                        label = "TopCornerRadius"
-                    )
-                    val animatedBottomRadius by animateDpAsState(
-                        targetValue = targetBottomRadius,
-                        animationSpec = spring(stiffness = sharedStiffness),
-                        label = "BottomCornerRadius"
-                    )
+                val animatedTopRadius by animateDpAsState(
+                    targetValue = targetTopRadius,
+                    animationSpec = spring(stiffness = sharedStiffness),
+                    label = "TopCornerRadius"
+                )
+                val animatedBottomRadius by animateDpAsState(
+                    targetValue = targetBottomRadius,
+                    animationSpec = spring(stiffness = sharedStiffness),
+                    label = "BottomCornerRadius"
+                )
 
-                    Surface(
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 2.dp),
-                        shape = RoundedCornerShape(
-                            topStart = animatedTopRadius,
-                            topEnd = animatedTopRadius,
-                            bottomStart = animatedBottomRadius,
-                            bottomEnd = animatedBottomRadius
-                        ),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
-                            alpha = CardConfig.cardAlpha
-                        ),
-                    ) {
-                        AppGroupItem(
-                            appGroup = appGroup,
-                            isSelected = appGroup.packageNames.any {
-                                viewModel.selectedApps.contains(
+                Surface(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 2.dp),
+                    shape = RoundedCornerShape(
+                        topStart = animatedTopRadius,
+                        topEnd = animatedTopRadius,
+                        bottomStart = animatedBottomRadius,
+                        bottomEnd = animatedBottomRadius
+                    ),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
+                        alpha = CardConfig.cardAlpha
+                    ),
+                ) {
+                    AppGroupItem(
+                        appGroup = appGroup,
+                        isSelected = appGroup.packageNames.any {
+                            viewModel.selectedApps.contains(
+                                it
+                            )
+                        },
+                        onToggleSelection = {
+                            appGroup.packageNames.forEach {
+                                viewModel.toggleAppSelection(
                                     it
                                 )
-                            },
-                            onToggleSelection = {
-                                appGroup.packageNames.forEach {
-                                    viewModel.toggleAppSelection(
-                                        it
-                                    )
-                                }
-                            },
-                            onClick = {
-                                if (viewModel.showBatchActions) {
-                                    appGroup.packageNames.forEach { viewModel.toggleAppSelection(it) }
-                                } else {
-                                    navigator.navigate(AppProfileScreenDestination(appGroup))
-                                }
-                            },
-                            onLongClick = {
-                                if (!viewModel.showBatchActions) {
-                                    viewModel.toggleBatchMode()
-                                    appGroup.packageNames.forEach { viewModel.toggleAppSelection(it) }
-                                }
-                            },
-                            viewModel = viewModel
-                        )
-                    }
+                            }
+                        },
+                        onClick = {
+                            if (viewModel.showBatchActions) {
+                                appGroup.packageNames.forEach { viewModel.toggleAppSelection(it) }
+                            } else {
+                                navigator.navigate(AppProfileScreenDestination(appGroup))
+                            }
+                        },
+                        onLongClick = {
+                            if (!viewModel.showBatchActions) {
+                                viewModel.toggleBatchMode()
+                                appGroup.packageNames.forEach { viewModel.toggleAppSelection(it) }
+                            }
+                        },
+                        viewModel = viewModel
+                    )
                 }
             }
             item {
-                Spacer(modifier = Modifier.height(bottomPadding + 5.dp))
+                Spacer(modifier = Modifier.height(bottomPadding))
             }
         }
     }

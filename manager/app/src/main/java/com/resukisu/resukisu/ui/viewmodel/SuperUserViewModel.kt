@@ -1,36 +1,48 @@
 package com.resukisu.resukisu.ui.viewmodel
 
-import android.content.*
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.graphics.drawable.Drawable
 import android.os.IBinder
 import android.os.Parcelable
 import android.util.Log
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.ksuApp
 import com.resukisu.resukisu.ui.KsuService
-import com.resukisu.resukisu.ui.util.*
+import com.resukisu.resukisu.ui.util.HanziToPinyin
+import com.resukisu.zako.IKsuInterface
 import com.topjohnwu.superuser.Shell
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.parcelize.IgnoredOnParcel
+import kotlinx.parcelize.Parcelize
 import java.text.Collator
-import java.util.*
+import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import com.resukisu.zako.IKsuInterface
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.parcelize.IgnoredOnParcel
-import kotlinx.parcelize.Parcelize
 
 enum class AppCategory(val displayNameRes: Int, val persistKey: String) {
     ALL(com.resukisu.resukisu.R.string.category_all_apps, "ALL"),
@@ -62,8 +74,6 @@ class SuperUserViewModel : ViewModel() {
         private const val TAG = "SuperUserViewModel"
         private val appsLock = Any()
         var apps by mutableStateOf<List<AppInfo>>(emptyList())
-        private val _isAppListLoaded = MutableStateFlow(false)
-        val isAppListLoaded = _isAppListLoaded.asStateFlow()
 
         @JvmStatic
         fun getAppIconDrawable(context: Context, packageName: String): Drawable? {
@@ -344,10 +354,6 @@ class SuperUserViewModel : ViewModel() {
             }
 
             stopKsuService()
-
-            synchronized(appsLock) {
-                _isAppListLoaded.value = true
-            }
 
             appListMutex.withLock {
                 val filteredApps = result.filter { it.packageName != ksuApp.packageName }

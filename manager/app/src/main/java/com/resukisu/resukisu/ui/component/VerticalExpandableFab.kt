@@ -1,14 +1,41 @@
 package com.resukisu.resukisu.ui.component
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -180,12 +207,16 @@ fun VerticalExpandableFab(
                 onMainButtonClick?.invoke()
                 isExpanded = !isExpanded
             },
-            modifier = Modifier.size(buttonSize).scale(mainButtonScale),
+            modifier = Modifier
+                .size(buttonSize)
+                .scale(mainButtonScale),
             elevation = FloatingActionButtonDefaults.elevation(
                 defaultElevation = 6.dp,
                 pressedElevation = 8.dp,
                 hoveredElevation = 8.dp
-            )
+            ),
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = MaterialTheme.colorScheme.primary,
         ) {
             Icon(
                 imageVector = if (isExpanded) mainButtonExpandedIcon else mainButtonIcon,
