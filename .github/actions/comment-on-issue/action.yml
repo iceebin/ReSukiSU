@@ -1,0 +1,26 @@
+name: 'Comment on Issue'
+description: 'Comments on an issue with the provided message'
+inputs:
+  message:
+    description: 'Comment message'
+    required: true
+  GITHUB_TOKEN:
+    description: 'GitHub token of the repository'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.GITHUB_TOKEN }}
+        script: |
+          const issue_number = context.payload.issue?.number;
+          if (!issue_number) {
+            core.setFailed('No issue found.');
+            return;
+          }
+          await github.rest.issues.createComment({
+            ...context.repo,
+            issue_number,
+            body: `${{ inputs.message }}`
+          });
