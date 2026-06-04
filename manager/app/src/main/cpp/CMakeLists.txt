@@ -13,9 +13,17 @@ add_library(kernelsu
         legacy.c
 )
 
+target_include_directories(kernelsu PRIVATE .)
+
 find_library(log-lib log)
 
 target_link_libraries(
         kernelsu
         ${log-lib}
 )
+
+find_package(cxx REQUIRED CONFIG)
+link_libraries(cxx::cxx)
+
+add_library(adbroot SHARED adbroot.cc)
+target_link_libraries(adbroot ${log-lib})

@@ -23,6 +23,7 @@ import com.resukisu.resukisu.ui.util.createRootShell
 import com.resukisu.resukisu.ui.viewmodel.ModuleViewModel
 import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -37,6 +38,12 @@ internal suspend fun prepareWebView(
     moduleViewModel: ModuleViewModel,
 ) {
     withContext(Dispatchers.IO) {
+        suspendCancellableCoroutine { continuation ->
+            moduleViewModel.fetchModuleList(callBack = {
+                if (continuation.isActive) continuation.resume(Unit) { _, _, _ -> }
+            })
+        }
+
         val moduleInfo = moduleViewModel.moduleList.find { info -> info.id == moduleId }
 
         if (moduleInfo == null) {
@@ -105,7 +112,9 @@ internal suspend fun prepareWebView(
                             if (icon != null) {
                                 val stream = ByteArrayOutputStream()
                                 icon.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                                return WebResourceResponse("image/png", null,
+                                return WebResourceResponse(
+                                    "image/png", null, 200, "OK",
+                                    mapOf("Access-Control-Allow-Origin" to "*"),
                                     ByteArrayInputStream(stream.toByteArray())
                                 )
                             }

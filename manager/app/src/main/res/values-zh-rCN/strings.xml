@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="learn_more">了解更多</string>
     <string name="home">主页</string>
+    <string name="learn_more">了解更多</string>
     <string name="home_not_installed">未安装</string>
     <string name="home_click_to_install">点击安装</string>
     <string name="home_working">工作中</string>
@@ -15,8 +15,31 @@
     <string name="selinux_status_disabled">被禁用</string>
     <string name="selinux_status_enforcing">强制执行</string>
     <string name="selinux_status_permissive">宽容模式</string>
+    <string name="home_seccomp_status">Seccomp 状态</string>
+    <string name="seccomp_status_not_supported">内核未开启</string>
+    <string name="seccomp_status_disabled">未启用</string>
+    <string name="seccomp_status_strict">严格模式</string>
+    <string name="seccomp_status_filter">过滤模式</string>
+    <string name="seccomp_status_unknown">未知</string>
     <string name="unknown">未知</string>
     <string name="superuser">超级用户</string>
+    <string name="sulog">超级用户访问日志</string>
+    <string name="sulog_log_files">日志文件</string>
+    <string name="sulog_failed_to_load">加载日志文件失败</string>
+    <string name="sulog_disabled_title">超级用户访问日志已禁用</string>
+    <string name="sulog_unsupported_title">内核不支持超级用户访问日志</string>
+    <string name="sulog_enable_action">启用</string>
+    <string name="sulog_filter_title">按类型筛选</string>
+    <string name="sulog_clean_title">清除日志</string>
+    <string name="sulog_filter_root_execve">执行 Root 进程</string>
+    <string name="sulog_filter_sucompat">传统 su 命令兼容</string>
+    <string name="sulog_filter_ioctl_grant_root">授予 Root 权限</string>
+    <string name="sulog_filter_daemon_restart">守护进程重启</string>
+    <string name="sulog_event_dropped">事件丢弃</string>
+    <string name="sulog_drop_count">%s 个事件被丢弃</string>
+    <string name="sulog_daemon_restart_count">重启 #%s</string>
+    <string name="sulog_entry_unknown_event">未知事件</string>
+    <string name="sulog_search_placeholder">搜索日志</string>
     <string name="module_failed_to_enable">无法启用模块：%s</string>
     <string name="module_failed_to_disable">无法禁用模块：%s</string>
     <string name="module_empty">没有安装模块</string>
@@ -26,18 +49,28 @@
     <string name="module_sort_star_first">排序 (星标数优先)</string>
     <string name="module_sort_enabled_first">排序（已启用优先）</string>
     <string name="uninstall">卸载</string>
-    <string name="module_install">安装</string>
     <string name="install">安装</string>
     <string name="reboot">重启</string>
     <string name="settings">设置</string>
-    <string name="reboot_userspace">软重启</string>
+    <string name="reboot_soft">软重启</string>
+    <string name="reboot_userspace">用户空间重启</string>
     <string name="reboot_recovery">重启到 Recovery</string>
     <string name="reboot_bootloader">重启到 Bootloader</string>
     <string name="reboot_download">重启到 Download</string>
     <string name="reboot_edl">重启到 EDL</string>
     <string name="about">关于</string>
+    <string name="about_anime_character_sticker"><![CDATA[有动漫人物图片表情包的图像版权为%1$s所有，图像中的知识产权由%2$s 所有。在使用这些文件之前，除了必须遵守 %3$s 以外，还需要遵守向前两者索要使用这些艺术内容的授权。]]></string>
+    <string name="get_source_code">查看源代码</string>
+    <string name="get_source_code_detail">在 GitHub 上查看源代码</string>
+    <string name="join_telegram_group">加入社区</string>
+    <string name="join_telegram_group_detail">加入我们的 Telegram 频道</string>
+    <string name="open_source_license">开放源代码许可</string>
+    <string name="open_source_license_settings_description">查看本应用所使用的第三方开源库及其许可证信息</string>
+    <string name="visit_home_page">访问主页</string>
+    <string name="license">许可证：%s</string>
+    <string name="no_license_text">许可证内容不可用。</string>
     <string name="module_uninstall_confirm">确定要卸载模块 %s 吗？</string>
-    <string name="metamodule_uninstall_confirm">"您确定要卸载模块 %s 吗？此操作将影响所有模块，并且元模块提供的某些功能（如挂载）将不再工作。  "</string>
+    <string name="metamodule_uninstall_confirm">您确定要卸载模块 %s 吗？此操作将影响所有模块，并且元模块提供的某些功能（如挂载）将不再工作。  </string>
     <string name="module_uninstall_success">%s 已卸载</string>
     <string name="module_uninstall_failed">卸载失败：%s</string>
     <string name="module_version">版本</string>
@@ -47,6 +80,18 @@
     <string name="hide_system_apps">隐藏系统应用</string>
     <string name="send_log">发送日志</string>
     <string name="safe_mode">安全模式</string>
+    <string name="jailbreak_mode">越狱模式</string>
+    <string name="home_jailbreak">越狱</string>
+    <string name="jailbreak_timeout">越狱可能失败，请检查日志</string>
+    <string name="jailbreak_flash_warning">当前处于**越狱模式**。在**未解锁 Bootloader** 的设备上刷写分区会破坏 AVB（Android 验证启动），可能导致设备**无法开机**。\n\n请确保 Bootloader 已解锁后再继续操作！</string>
+    <string name="jailbreak_flash_warning_countdown">继续 (%1$d)</string>
+    <string name="settings_auto_jailbreak">自动越狱</string>
+    <string name="settings_auto_jailbreak_summary">开机检测到 Permissive SELinux 时自动使用 Magica 提权。需要授予本应用自启动权限。</string>
+    <string name="settings_adb_root_summary">以 root 权限运行 adbd 守护进程</string>
+    <string name="settings_selinux_hide">隐藏 SELinux 修改</string>
+    <string name="settings_selinux_hide_summary">阻止应用检测 SELinux 修改</string>
+    <string name="settings_selinux_hide_reboot_required">重启生效</string>
+    <string name="settings_selinux_hide_failed">错误： %d</string>
     <string name="reboot_to_apply">重启生效</string>
     <string name="module_magisk_conflict">因与 Magisk 有冲突，所有模块不可用！</string>
     <string name="home_learn_kernelsu">了解 KernelSU</string>
@@ -54,11 +99,9 @@
     <string name="home_click_to_learn_kernelsu">了解如何安装 KernelSU 以及如何开发模块</string>
     <string name="home_support_title">支持开发</string>
     <string name="home_support_content">KernelSU 将保持免费开源，向开发者捐赠以表示支持。</string>
-    <string name="about_source_code"><![CDATA[在 %1$s 查看源码<br/>加入我们的 %2$s 频道<br/><br/>有动漫人物图片表情包的图像版权为%3$s所有，图像中的知识产权由%4$s 所有。在使用这些文件之前，除了必须遵守 %5$s 以外，还需要遵守向前两者索要使用这些艺术内容的授权。]]></string>
     <string name="profile_default">默认</string>
     <string name="profile_template">模版</string>
     <string name="profile_custom">自定义</string>
-    <string name="profile_name">名称</string>
     <string name="profile_namespace">挂载命名空间</string>
     <string name="profile_namespace_inherited">继承</string>
     <string name="profile_namespace_global">全局</string>
@@ -68,7 +111,9 @@
     <string name="profile_selinux_context">SELinux</string>
     <string name="profile_umount_modules">卸载模块</string>
     <string name="failed_to_update_app_profile">为 %s 更新 App Profile 失败</string>
-    <string name="require_kernel_version" formatted="false">当前 KernelSU 版本 %s 过低，管理器无法正常工作，请将内核 KernelSU 版本升级至 %s 或以上！</string>
+    <string name="debug_version_notice">"你正在使用管理器的 DEBUG 构建，如果你不知道什么是 DEBUG 构建，请立即切换至 RELEASE 构建"</string>
+    <string name="unofficial_version_notice">"您使用的管理器并非 %s 官方管理器，您可能无法获得权限。"</string>
+    <string name="conflict_with_apatch">检测到 APatch, 所有功能均可能停止工作</string>
     <string name="settings_umount_modules_default">默认卸载模块</string>
     <string name="settings_umount_modules_default_summary">App Profile 中\"卸载模块\"的全局默认值，如果启用，将会为没有设置 Profile 的应用移除所有模块针对系统的修改。</string>
     <string name="profile_umount_modules_summary">启用该选项后将允许 KernelSU 为本应用还原被模块修改过的文件。</string>
@@ -109,12 +154,11 @@
     <string name="module_changelog_failed">获取更新日志失败：%s</string>
     <string name="settings_check_update">更新提醒</string>
     <string name="settings_check_update_summary">自动检查模块和管理器更新</string>
-    <string name="debug_version_notice">"你正在使用管理器的 DEBUG 构建，如果你不知道什么是 DEBUG 构建，请立即切换至 RELEASE 构建"</string>
     <string name="grant_root_failed">获取 root 失败！</string>
+    <string name="home_pr_build_warning">当前为 PR 调试构建，请勿在生产环境中使用！</string>
+    <string name="home_pr_kernel_warning">当前内核包含 PR 签名支持，这不是一个生产内核！</string>
     <string name="action">执行</string>
     <string name="close">关闭</string>
-    <string name="enable_web_debugging">启用 WebView 调试</string>
-    <string name="enable_web_debugging_summary">可用于调试 WebUI 。请仅在需要时启用。</string>
     <string name="direct_install">直接安装（推荐）</string>
     <string name="select_file">选择一个需要修补的镜像</string>
     <string name="install_inactive_slot">安装到未使用的槽位（OTA 后）</string>
@@ -138,23 +182,10 @@
     <string name="selected_lkm">已选择的 LKM：%s</string>
     <string name="save_log">保存日志</string>
     <string name="log_saved">日志已保存</string>
-    <!-- Module related -->
-    <string name="module_install_confirm">确认安装模块 %1$s？</string>
     <string name="unknown_module">未知模块</string>
-    <!-- Restore related -->
-    <string name="restore_confirm_title">确认还原模块</string>
-    <string name="restore_confirm_message">此操作将覆盖所有现有模块，是否继续？</string>
     <string name="confirm">确定</string>
     <string name="cancel">取消</string>
-    <!-- Backup related -->
-    <!-- Restore related messages -->
-    <string name="restore_success">模块已成功还原，需重启生效</string>
-    <string name="restore_failed">还原失败：%1$s</string>
-    <string name="restart_now">立即重启</string>
-    <string name="unknown_error">未知错误</string>
-    <!-- Command related -->
     <string name="command_execution_failed">命令执行失败：%1$s</string>
-    <!-- Allowlist related -->
     <string name="allowlist_backup_success">应用列表备份成功</string>
     <string name="allowlist_backup_failed">应用列表备份失败：%1$s</string>
     <string name="allowlist_restore_confirm_title">确认还原应用列表</string>
@@ -165,25 +196,30 @@
     <string name="restore_allowlist">还原应用列表</string>
     <string name="settings_custom_background">自定义背景</string>
     <string name="settings_custom_background_summary">选择一张图片作为应用背景</string>
+    <string name="settings_config_enable_blur">启用模糊</string>
+    <string name="settings_config_enable_blur_summary">对此 App 启用模糊处理</string>
+    <string name="settings_exp_draw_background_to_blur">将自定义背景渲染到模糊</string>
+    <string name="settings_exp_draw_background_to_blur_description">实验性功能，后果自负</string>
+    <string name="settings_config_use_custom_background_seed_color">从自定义背景图片中取色</string>
+    <string name="settings_config_use_custom_background_seed_color_summary">从自定义背景图中提取动态颜色种子色</string>
+    <string name="settings_custom_enable_high_contrast">高对比度模式</string>
+    <string name="settings_custom_enable_high_contrast_summary">在文本周围渲染阴影</string>
     <string name="settings_card_alpha">卡片不透明度</string>
     <string name="home_android_version">Android 版本</string>
     <string name="home_device_model">设备</string>
     <string name="su_not_allowed">不允许授予 %s 超级用户权限</string>
-    <string name="settings_mode_enable_by_default">启用（默认）</string>
-    <string name="settings_mode_disable_until_reboot">禁用直到下次重启</string>
-    <string name="settings_mode_disable_always">始终禁用</string>
     <string name="settings_sucompat">传统 su 命令支持</string>
     <string name="settings_sucompat_summary">允许通过 /system/bin/su 获取 Root 权限</string>
     <string name="settings_kernel_umount">内核处理卸载模块</string>
     <string name="settings_kernel_umount_summary">在内核给需要的应用卸载模块</string>
-    <string name="settings_sulog">记录超级用户访问日志</string>
-    <string name="settings_sulog_summary">在内核记录超级用户请求日志</string>
     <string name="feature_status_unsupported_summary">内核不支持此功能。</string>
+    <string name="settings_mode_disable_until_reboot">禁用直到下次重启</string>
+    <string name="settings_mode_disable_always">始终禁用</string>
+    <string name="settings_sulog">超级用户访问日志</string>
+    <string name="settings_sulog_summary">记录与 Root 有关的事件到 KernelSU 超级用户访问日志文件</string>
     <string name="feature_status_managed_summary">此功能由模块管理。</string>
     <string name="settings_mode_default">默认</string>
-    <string name="module_install_multiple_confirm_with_names">确定要安装以下 %1$d 个模块吗？\n\n%2$s</string>
     <string name="more_settings">更多设置</string>
-    <string name="selinux">SELinux</string>
     <string name="selinux_enabled">强制执行</string>
     <string name="selinux_disabled">宽容模式</string>
     <string name="simple_mode">简洁模式</string>
@@ -206,7 +242,6 @@
     <string name="theme_follow_system">跟随系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
-    <string name="manual_hook">Manual Hook</string>
     <string name="dynamic_color_title">动态颜色</string>
     <string name="dynamic_color_summary">使用系统主题的动态颜色</string>
     <string name="choose_theme_color">选择主题色</string>
@@ -255,11 +290,7 @@
     <string name="invalid_file_type">文件类型不正确，请选择 .kpm 文件</string>
     <string name="confirm_uninstall_title_with_filename">卸载</string>
     <string name="confirm_uninstall_content">将卸载以下 KPM 模块：\n%s</string>
-    <string name="image_editor_hint">使用双指缩放图片，单指拖动调整位置</string>
-    <string name="reprovision">重置</string>
-    <!-- Kernel Flash Progress Related -->
     <string name="horizon_flash_complete">刷写完成</string>
-    <!-- Flash Status Related -->
     <string name="horizon_preparing">准备中…</string>
     <string name="horizon_cleaning_files">清理文件…</string>
     <string name="horizon_copying_files">复制文件…</string>
@@ -267,7 +298,6 @@
     <string name="horizon_patching_script">修补刷写脚本…</string>
     <string name="horizon_flashing">刷写内核中…</string>
     <string name="horizon_flash_complete_status">刷写完成</string>
-    <!-- Slot selection related strings -->
     <string name="select_slot_title">选择刷写槽位</string>
     <string name="select_slot_description">请选择要刷写 boot 的目标槽位</string>
     <string name="slot_a">A 槽位</string>
@@ -277,11 +307,9 @@
     <string name="horizon_setting_target_slot">设置指定槽位</string>
     <string name="horizon_restoring_original_slot">恢复默认槽位</string>
     <string name="current_slot">当前系统默认槽位：%1$s </string>
-    <!-- Error Messages -->
     <string name="horizon_copy_failed">复制失败</string>
     <string name="horizon_unknown_error">未知错误</string>
     <string name="flash_failed_message">刷写失败</string>
-    <!-- lkm/gki install -->
     <string name="Lkm_install_methods">LKM 修补/安装</string>
     <string name="GKI_install_methods">刷写 AnyKernel3</string>
     <string name="kernel_version_log">内核版本：%1$s</string>
@@ -289,28 +317,34 @@
     <string name="configuration">配置</string>
     <string name="app_settings">应用设置</string>
     <string name="tools">工具</string>
-    <!--  String resources used in SuperUser -->
     <string name="no_apps_found">未找到应用</string>
     <string name="selinux_enabled_toast">SELinux 已设置为启用状态</string>
     <string name="selinux_disabled_toast">SELinux 已设置为禁用状态</string>
     <string name="selinux_change_failed">SELinux 状态更改失败</string>
     <string name="advanced_settings">高级设置</string>
     <string name="appearance_settings">外观设置</string>
+    <string name="predictive_back_settings">预测性返回</string>
+    <string name="predictive_back_animation">预测性返回动画</string>
+    <string name="predictive_back_animation_desc">选择预测性返回的动画效果</string>
+    <string name="predictive_back_exit_direction">退出方向</string>
+    <string name="predictive_back_exit_direction_desc">选择预测性返回的退出方向</string>
+    <string name="predictive_back_animation_none">无</string>
+    <string name="predictive_back_animation_scale">缩放</string>
+    <string name="predictive_back_animation_ksu_classic">KernelSU 经典</string>
+    <string name="predictive_back_exit_direction_follow_gesture">跟随手势</string>
+    <string name="predictive_back_exit_direction_always_right">始终向右</string>
+    <string name="predictive_back_exit_direction_always_left">始终向左</string>
     <string name="back">返回</string>
     <string name="background_set_success">背景设置成功</string>
     <string name="background_removed">已移除自定义背景</string>
     <string name="icon_switch_title">备选图标</string>
     <string name="icon_switch_summary">更换为 KernelSU 图标</string>
     <string name="icon_switched">已切换图标</string>
-    <!-- KPM display settings -->
     <string name="show_kpm_info">隐藏 KPM 功能</string>
     <string name="show_kpm_info_summary">在主页和底栏隐藏 KPM 相关功能和信息</string>
-    <!-- WebUI settings -->
+    <string name="module_webui_alert">来自模块 %s 的消息</string>
     <string name="no_such_module">模块 %s 不存在</string>
     <string name="module_unavailable">模块 %s 被禁用或待卸载</string>
-    <string name="module_webui_alert">来自模块 %s 的消息</string>
-    <string name="select_default_webui_engine">默认 WebUI 引擎</string>
-    <!-- DPI setting related strings -->
     <string name="app_dpi_title">应用 DPI</string>
     <string name="app_dpi_summary">仅调整当前应用的屏幕显示密度</string>
     <string name="dpi_size_small">小</string>
@@ -322,25 +356,19 @@
     <string name="dpi_confirm_title">确认更改 DPI</string>
     <string name="dpi_confirm_message">你确定要将应用 DPI 从 %1$d 更改为 %2$d 吗？</string>
     <string name="dpi_applied_success">DPI 已设置为 %1$d</string>
-    <!-- Language settings related strings -->
     <string name="settings_language">应用语言</string>
     <string name="language_system_default">跟随系统</string>
     <string name="settings_background_dim">背景暗度调节</string>
-    <!-- Flash related -->
     <string name="error_code">错误代码</string>
     <string name="check_log">请查看日志</string>
     <string name="installing_module">正在安装模块 %1$d/%2$d</string>
     <string name="module_failed_count">%d 个模块安装失败</string>
-    <string name="module_download_error">模块下载失败</string>
     <string name="kernel_flashing">内核刷写</string>
     <string name="warning_of_meta_module_title">需要元模块</string>
     <string name="warning_of_meta_module_summary">这个模块需要挂载一些文件。需要安装元模块，使它正常工作</string>
-    <!-- 分类相关 -->
     <string name="category_all_apps">全部</string>
-    <string name="category_root_apps">Root</string>
     <string name="category_custom_apps">自定义</string>
     <string name="category_default_apps">默认</string>
-    <!-- 排序相关 -->
     <string name="sort_name_asc">名称升序</string>
     <string name="sort_name_desc">名称降序</string>
     <string name="sort_install_time_new">安装时间（新）</string>
@@ -348,9 +376,9 @@
     <string name="sort_size_desc">大小降序</string>
     <string name="sort_size_asc">大小升序</string>
     <string name="sort_usage_freq">使用频率</string>
-    <!-- 状态相关 -->
     <string name="no_apps_in_category">此分类中没有应用</string>
-    <!-- 标签相关 -->
+    <string name="persistent">持久</string>
+    <string name="temporary">临时</string>
     <string name="deny_authorization">取消授权</string>
     <string name="grant_authorization">授权</string>
     <string name="unmount_modules">卸载模块挂载</string>
@@ -361,11 +389,9 @@
     <string name="scroll_to_bottom">底部</string>
     <string name="selected">已选择</string>
     <string name="select">选择</string>
-    <!-- BottomSheet相关 -->
     <string name="menu_options">菜单选项</string>
     <string name="sort_options">排序方式</string>
     <string name="app_categories">应用类型选择</string>
-    <!-- SuSFS Configuration -->
     <string name="susfs_config_title">SuSFS 配置</string>
     <string name="susfs_config_description">配置说明</string>
     <string name="susfs_config_description_text">此功能允许您自定义 SuSFS 的 uname 值和构建时间伪装。输入您想要设置的值，点击应用即可生效</string>
@@ -377,16 +403,12 @@
     <string name="susfs_current_build_time">当前构建时间: %s</string>
     <string name="susfs_reset_to_default">重置为默认值</string>
     <string name="susfs_apply">应用</string>
-    <!-- SuSFS Reset Confirmation -->
     <string name="susfs_reset_confirm_title">确认重置</string>
-    <!-- SuSFS Toast Messages -->
     <string name="susfs_binary_not_found">无法找到 ksu_susfs 文件</string>
     <string name="susfs_command_failed">SuSFS 命令执行失败</string>
     <string name="susfs_command_error">执行 SuSFS 命令时出错: %s</string>
     <string name="susfs_uname_set_success" formatted="false">SuSFS 内核名称和构建时间设置成功: %s, %s</string>
-    <!-- SuSFS Settings Item -->
     <string name="susfs_config_setting_title">SuSFS 配置</string>
-    <!-- 开机自启动相关 -->
     <string name="susfs_autostart_title">开机自启动</string>
     <string name="susfs_autostart_description">重启时自动应用所有非默认配置</string>
     <string name="susfs_autostart_requirement">需要添加配置后才能启用</string>
@@ -394,33 +416,27 @@
     <string name="susfs_autostart_disable_failed">禁用开机自启动失败</string>
     <string name="susfs_autostart_error">开机自启动配置错误: %s</string>
     <string name="susfs_no_config_to_autostart">没有可用的配置进行开机自启动</string>
-    <!-- SuSFS Tab Titles -->
     <string name="susfs_tab_basic_settings">基本设置</string>
     <string name="susfs_tab_sus_paths">SuS 路径</string>
     <string name="susfs_tab_path_settings">路径设置</string>
     <string name="susfs_tab_enabled_features">启用功能状态</string>
-    <!-- SuSFS Path Management -->
     <string name="susfs_add_sus_path">添加 SuS 路径</string>
     <string name="susfs_sus_path_added_success">SuS 路径添加成功</string>
     <string name="susfs_path_not_found_error">路径未找到错误</string>
     <string name="susfs_path_label">路径</string>
     <string name="susfs_path_placeholder">例如: /system/addon.d</string>
     <string name="susfs_no_paths_configured">暂无 SuS 路径配置</string>
-    <!-- SuSFS Reset Categories -->
     <string name="susfs_reset_paths_title">重置 SuS 路径</string>
     <string name="susfs_reset_paths_message">这将清除所有 SuS 路径配置，确定要继续吗？</string>
     <string name="susfs_reset_path_title">重置路径设置</string>
-    <!-- SuSFS Path Settings -->
     <string name="susfs_android_data_path_label">Android Data 路径</string>
     <string name="susfs_sdcard_path_label">SDCard 路径</string>
     <string name="susfs_set_android_data_path">设置 Android Data 路径</string>
     <string name="susfs_set_sdcard_path">设置 SDCard 路径</string>
-    <!-- SuSFS Enabled Features -->
     <string name="susfs_enabled_features_description">显示当前 SuSFS 启用的功能状态</string>
     <string name="susfs_no_features_found">未找到功能状态信息</string>
     <string name="susfs_feature_enabled">已启用</string>
     <string name="susfs_feature_disabled">已禁用</string>
-    <!-- Feature Labels -->
     <string name="sus_path_feature_label">SuS 路径支持</string>
     <string name="spoof_uname_feature_label">欺骗 uname 支持</string>
     <string name="spoof_cmdline_feature_label">欺骗 Cmdline/Bootconfig</string>
@@ -429,7 +445,6 @@
     <string name="hide_symbols_feature_label">隐藏 KSU SuSFS 符号</string>
     <string name="sus_kstat_feature_label">SuS Kstat 支持</string>
     <string name="sus_map_feature_label">SUS Map 支持</string>
-    <!-- 可切换状态 -->
     <string name="susfs_feature_configurable">可配置的 SuSFS 功能</string>
     <string name="susfs_enable_log_label">SuSFS 启用日志</string>
     <string name="susfs_log_config_description">启用或者关闭 SuSFS 的日志</string>
@@ -438,13 +453,10 @@
     <string name="susfs_log_disabled">关闭 SuSFS 日志</string>
     <string name="module_update_json">更新配置</string>
     <string name="module_update_json_copied">更新配置地址已复制到剪贴板</string>
-    <!-- Settings related strings -->
     <string name="show_more_module_info">显示更多模块信息</string>
     <string name="show_more_module_info_summary">显示额外的模块信息，如更新配置 URL 等</string>
     <string name="susfs_execution_location_label">执行位置</string>
     <string name="susfs_current_execution_location">当前执行位置：%s</string>
-    <string name="susfs_execution_location_service">Service</string>
-    <string name="susfs_execution_location_post_fs_data">Post-FS-Data</string>
     <string name="susfs_execution_location_service_description">在系统服务启动后执行</string>
     <string name="susfs_execution_location_post_fs_data_description">在文件系统挂载后但系统完全启动前执行,可能会导致循环重启</string>
     <string name="susfs_slot_info_title">槽位信息</string>
@@ -456,10 +468,8 @@
     <string name="susfs_slot_use_uname">使用 Uname</string>
     <string name="susfs_slot_use_build_time">使用构建时间</string>
     <string name="susfs_slot_info_unavailable">无法获取槽位信息</string>
-    <!-- SuSFS 自启动相关字符串 -->
     <string name="susfs_autostart_enabled_success">SuSFS 自启动模块已启用，模块路径：%s</string>
     <string name="susfs_autostart_disabled_success">SuSFS 自启动模块已禁用</string>
-    <!-- SuSFS Kstat相关字符串 -->
     <string name="susfs_tab_kstat_config">Kstat 配置</string>
     <string name="kstat_static_config_added">Kstat 静态配置已添加：%1$s</string>
     <string name="kstat_config_removed">已移除 Kstat 配置：%1$s</string>
@@ -482,7 +492,6 @@
     <string name="static_kstat_config">静态 Kstat 配置</string>
     <string name="kstat_path_management">Kstat 路径管理</string>
     <string name="no_kstat_config_message">暂无 Kstat 配置，点击下方按钮添加配置</string>
-    <!-- SuSFS Mount Hiding Control Related Strings -->
     <string name="susfs_hide_mounts_control_title">SuS 挂载隐藏控制</string>
     <string name="susfs_hide_mounts_control_description">控制 SuS 挂载对进程的隐藏行为</string>
     <string name="susfs_hide_mounts_for_all_procs_label">对所有进程隐藏 SuS 挂载</string>
@@ -494,12 +503,9 @@
     <string name="susfs_hide_mounts_current_setting">当前设置: %s</string>
     <string name="susfs_hide_mounts_setting_all">对所有进程隐藏</string>
     <string name="susfs_hide_mounts_setting_non_ksu">仅对非 KSU 进程隐藏</string>
-    <string name="kernel_simple_kernel">内核版本简洁模式</string>
-    <string name="kernel_simple_kernel_summary">启用或禁用 SukiSU 内核版本显示的简洁模式</string>
     <string name="susfs_android_data_path_set">Android Data 路径已设置为: %s</string>
     <string name="susfs_sdcard_path_set">SDCard 路径已设置为: %s</string>
     <string name="susfs_path_setup_warning">路径设置可能未完全成功，但将继续添加 SuS 路径</string>
-    <!-- 备份和还原相关字符串 -->
     <string name="susfs_backup_title">备份</string>
     <string name="susfs_backup_description">创建所有 SuSFS 配置的备份。备份文件将包含所有设置、路径和配置信息。</string>
     <string name="susfs_backup_create">创建备份</string>
@@ -521,7 +527,6 @@
     <string name="susfs_backup_info_version">版本：%s</string>
     <string name="hide_bl_script">上锁状态</string>
     <string name="hide_bl_script_description">覆盖引导锁状态属性于 late_start 服务模式</string>
-    <string name="clear">清空</string>
     <string name="cleanup_residue">清理工具残留</string>
     <string name="cleanup_residue_description">清理各种模块以及工具的残留文件和目录（可能会误删导致丢失以及无法启动，谨慎使用）</string>
     <string name="susfs_edit_sus_path">编辑 SuS 路径</string>
@@ -541,7 +546,6 @@
     <string name="susfs_add_app_path">添加应用路径</string>
     <string name="susfs_version_mismatch">SuSFS 库版本不匹配，内核：%1$s vs 管理器：%2$s，建议更新内核或管理器</string>
     <string name="warning">警告</string>
-    <string name="search">搜索</string>
     <string name="search_apps">搜索应用</string>
     <string name="search_modules">搜索模块</string>
     <string name="selected_apps_count">%1$d 个已选应用</string>
@@ -566,7 +570,6 @@
     <string name="no_active_manager">无活跃管理器</string>
     <string name="home_zygisk_implement">Zygisk 实现</string>
     <string name="home_meta_module_implement">元模块实现</string>
-    <!-- 循环路径相关 -->
     <string name="susfs_tab_sus_loop_paths">SuS 循环路径</string>
     <string name="susfs_add_sus_loop_path">添加 SuS 循环路径</string>
     <string name="susfs_edit_sus_loop_path">编辑 SuS 循环路径</string>
@@ -577,12 +580,10 @@
     <string name="susfs_reset_loop_paths_title">重置循环路径</string>
     <string name="susfs_reset_loop_paths_message">确定要清空所有 SuS 循环路径吗？此操作无法撤销。</string>
     <string name="susfs_loop_path_label">循环路径</string>
-    <string name="susfs_loop_path_placeholder">/data/example/path</string>
     <string name="susfs_loop_path_restriction_warning">注意：只有不在 /storage/ 和 /sdcard/ 内的路径才能通过循环路径添加。</string>
     <string name="susfs_loop_path_invalid_location">错误：循环路径不能位于 /storage/ 或 /sdcard/ 目录内</string>
     <string name="loop_paths_section">循环路径</string>
     <string name="add_loop_path">添加循环路径</string>
-    <!-- 循环路径功能描述 -->
     <string name="sus_loop_paths_description_title">循环路径配置</string>
     <string name="sus_loop_paths_description_text">循环路径会在每次非 root 用户应用或隔离服务启动时重新标记为 SUS_PATH。这有助于解决添加的路径可能因 inode 状态重置或内核中 inode 重新创建而失效的问题</string>
     <string name="avc_log_spoofing">AVC 日志欺骗</string>
@@ -594,7 +595,6 @@
 - 内核中默认设置为 \'0\'\n
 - 启用此功能有时会使开发人员在调试权限或 SELinux 问题时难以识别原因，因此建议用户在调试时禁用此功能。</string>
     <string name="home_hook_type">钩子类型</string>
-    <!-- KPM patching related strings -->
     <string name="kpm_patch_options">KPM 修补</string>
     <string name="kpm_patch_description">用于添加附加的 KPM 功能</string>
     <string name="enable_kpm_patch">KPM 修补</string>
@@ -605,7 +605,6 @@
     <string name="kpm_undo_patch_enabled">KPM 撤销修补已启用</string>
     <string name="kpm_patch_mode">KPM 修补模式</string>
     <string name="kpm_undo_patch_mode">KPM 撤销修补模式</string>
-    <!-- KPM workflow related -->
     <string name="kpm_preparing_tools">准备 KPM 修补工具</string>
     <string name="kpm_applying_patch">正在应用 KPM 修补</string>
     <string name="kpm_undoing_patch">正在撤销 KPM 修补</string>
@@ -613,27 +612,13 @@
     <string name="kpm_patch_success">KPM 修补成功</string>
     <string name="kpm_undo_patch_success">KPM 撤销修补成功</string>
     <string name="kpm_file_repacked">文件重新打包完成</string>
-    <!-- KPM error messages -->
     <string name="kpm_extract_zip_failed">解压压缩包失败</string>
     <string name="kpm_image_file_not_found">未找到 Image 文件</string>
     <string name="kpm_patch_failed">KPM 修补失败</string>
     <string name="kpm_undo_patch_failed">KPM 撤销修补失败</string>
     <string name="kpm_patch_operation_failed">KPM 修补操作失败: %s</string>
-    <!-- KPM option radio group strings -->
     <string name="kpm_follow_kernel_file">跟随内核</string>
     <string name="kpm_follow_kernel_description">原样使用内核，不进行任何 KPM 修改</string>
-    <!-- UID Scanner Settings -->
-    <string name="uid_auto_scan_title">用户态扫描应用列表</string>
-    <string name="uid_auto_scan_summary">开启后将使用用户态扫描应用列表，提高稳定性 (因内核扫描应用列表出现卡死等问题可以尝试打开此选项) </string>
-    <string name="uid_multi_user_scan_title">多用户应用扫描</string>
-    <string name="uid_multi_user_scan_summary">开启后将扫描所有用户的应用，包括工作资料等</string>
-    <string name="uid_scanner_setting_failed">设置失败，请检查权限</string>
-    <string name="clean_runtime_environment">清理运行环境</string>
-    <string name="clean_runtime_environment_summary">清理运行时文件并停止扫描服务</string>
-    <string name="clean_runtime_environment_confirm">您确定要清理运行环境吗？这将停止扫描服务并删除相关文件</string>
-    <string name="clean_runtime_environment_success">运行环境清理成功</string>
-    <string name="clean_runtime_environment_failed">运行环境清理失败</string>
-    <!-- 确认安装相关字符串 -->
     <string name="confirm_installation">确认安装</string>
     <string name="confirm_multiple_installation">确认安装（%d 个文件）</string>
     <string name="install_confirm">确认安装</string>
@@ -646,10 +631,8 @@
     <string name="author">作者</string>
     <string name="description">描述</string>
     <string name="supported_devices">支持设备</string>
-    <!-- SUS Map related strings -->
     <string name="susfs_tab_sus_maps">SUS映射</string>
     <string name="susfs_sus_map_label">库文件路径</string>
-    <string name="susfs_sus_map_placeholder">/data/adb/modules/my_module/zygisk/arm64-v8a.so</string>
     <string name="susfs_add_sus_map">添加SUS映射</string>
     <string name="susfs_edit_sus_map">编辑SUS映射</string>
     <string name="susfs_sus_map_added_success">SUS映射添加成功: %1$s</string>
@@ -663,49 +646,20 @@
     <string name="sus_maps_description_text">从 /proc/self/[maps|smaps|smaps_rollup|map_files|mem|pagemap] 中隐藏内存映射的真实文件路径。请注意：此功能不支持隐藏匿名内存映射，也无法隐藏由注入库本身产生的内联钩子或 PLT 钩子。</string>
     <string name="sus_maps_warning">重要提示：对于具备完善注入检测机制的应用，此功能可能无法有效绕过检测。</string>
     <string name="sus_maps_debug_info">首先通过 ps -enf 查找目标应用的 PID 和 UID，然后检查 /proc/&lt;pid&gt;/maps 中的相关路径，并与 /proc/1/mountinfo 中的设备号进行比对以确保一致性。只有当设备号一致时，隐藏映射才能正常工作。</string>
-    <string name="log_viewer_title">日志查看器</string>
-    <string name="log_viewer_back">返回</string>
-    <string name="log_viewer_search">搜索</string>
-    <string name="log_viewer_clear_logs">清空日志</string>
-    <string name="log_viewer_clear_logs_confirm">确定要清空选中的日志文件吗？此操作无法撤销。</string>
-    <string name="log_viewer_logs_cleared">日志清空成功</string>
-    <string name="log_viewer_filter_type">按类型筛选</string>
-    <string name="log_viewer_all_types">所有类型</string>
-    <string name="log_viewer_showing_entries">显示 %1$d / %2$d 条记录</string>
-    <string name="log_viewer_no_logs">未找到日志</string>
-    <string name="log_viewer_no_matching_logs">未找到匹配的日志</string>
-    <string name="log_viewer_refresh">刷新</string>
-    <string name="log_viewer_raw_log">原始日志</string>
-    <string name="log_viewer_search_placeholder">按 UID、命令或详情搜索…</string>
-    <string name="log_viewer_clear_search">清除搜索</string>
-    <string name="log_viewer_view_logs">查看使用日志</string>
-    <string name="log_viewer_view_logs_summary">查看 KernelSU 超级用户访问日志</string>
-    <string name="log_viewer_exclude_subtypes">排除子类型</string>
-    <string name="log_viewer_exclude_current_app">当前应用</string>
-    <string name="log_viewer_page_info">页面: %1$d/%2$d | 总日志: %3$d</string>
-    <string name="log_viewer_too_many_logs">日志过多，仅显示最新 %1$d 条</string>
-    <string name="log_viewer_load_more">加载更多日志</string>
-    <string name="log_viewer_all_logs_loaded">已显示所有日志</string>
     <string name="incompatible_kernel_msg">当前管理器与此内核不兼容！请将内核升级至版本 %2$d 或以上（当前 %1$d）</string>
     <string name="umount_path_manager">Umount 路径管理</string>
     <string name="umount_path_manager_summary">管理内核卸载路径</string>
-    <string name="changes_take_effect_immediately">所有修改将即时生效</string>
     <string name="no_any_umount_path">没有任何内核卸载路径</string>
     <string name="add_umount_path">添加 Umount 路径</string>
     <string name="mount_path">挂载路径</string>
     <string name="umount_flags">卸载标志</string>
     <string name="umount_flags_hint">0=正常卸载, 2=MNT_DETACH</string>
-    <string name="persistent">持久</string>
-    <string name="temporary">临时</string>
     <string name="confirm_delete">确认删除</string>
     <string name="confirm_delete_umount_path">确定要删除路径 %s 吗？</string>
     <string name="umount_path_added">卸载路径已添加</string>
     <string name="umount_path_removed">卸载路径已删除</string>
     <string name="operation_failed">操作失败</string>
-    <string name="confirm_action">确认操作</string>
-    <string name="confirm_clear_custom_paths">确定要清除所有自定义路径吗？（默认路径将保留）</string>
-    <string name="custom_paths_cleared">自定义路径已清除</string>
-    <string name="config_applied">配置已应用到内核</string>
+    <string name="changes_take_effect_immediately">所有修改将即时生效</string>
     <string name="group_contains_apps">包含 %1$d 个应用</string>
     <string name="meta_module_disabled">模块未挂载，因为元模块已禁用</string>
     <string name="meta_module_removed">模块未挂载，因为元模块即将删除</string>
@@ -731,14 +685,25 @@
     <string name="module_shortcut_title">创建快捷方式</string>
     <string name="module_shortcut_name_label">快捷方式名称</string>
     <string name="module_shortcut_icon_pick">选择自定义图标</string>
-    <string name="module_shortcut_add">添加快捷方式</string>
     <string name="module_shortcut_not_supported">启动器不支持桌面快捷方式。</string>
-    <string name="module_shortcut_should_not_empty">桌面快捷方式名称不得为空</string>
+    <string name="module_shortcut_should_not_empty">"桌面快捷方式名称不得为空"</string>
     <string name="module_shortcut_created">已在桌面创建快捷方式。</string>
     <string name="module_shortcut_updated">快捷方式已更新。</string>
     <string name="module_shortcut_delete">删除快捷方式</string>
-    <string name="module_shortcut_type_title">选择类型</string>
     <string name="module_shortcut_permission_tip_xiaomi">请在 Xiaomi 设置中为本应用启用“创建桌面快捷方式”权限。</string>
     <string name="module_shortcut_permission_tip_oppo">请在 OPPO 设置中为本应用启用“桌面快捷方式”权限。</string>
     <string name="module_shortcut_permission_tip_default">若创建快捷方式失败，请在系统设置中为本应用启用桌面快捷方式权限。</string>
+    <string name="download_channel_name">模块下载</string>
+    <string name="download_progress_title">正在下载 %s</string>
+    <string name="download_complete_title">下载完成</string>
+    <string name="download_complete_content">%s 下载成功</string>
+    <string name="download_failed_title">下载失败</string>
+    <string name="download_failed_content">%s 下载失败</string>
+    <string name="download">下载</string>
+    <string name="download_cancel">取消</string>
+    <string name="download_install">安装</string>
+    <string name="notification_permission_description">需要通知权限来展示下载进度</string>
+    <string name="notification_permission_denied">下载失败，缺失通知权限</string>
+    <string name="storage_permission_description">需要外部存储权限来展示下载进度</string>
+    <string name="storage_permission_denied">下载失败，缺失外部存储权限</string>
 </resources>

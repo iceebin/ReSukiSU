@@ -31,6 +31,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.outlined.Download
@@ -51,16 +53,19 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -86,35 +91,31 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.edit
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.OnlineModuleDetailScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
 import com.resukisu.resukisu.R
+import com.resukisu.resukisu.ui.activity.PermissionRequestInterface
 import com.resukisu.resukisu.ui.activity.util.isNetworkAvailable
 import com.resukisu.resukisu.ui.component.ConfirmDialogHandle
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.DialogHandle
 import com.resukisu.resukisu.ui.component.SearchAppBar
-import com.resukisu.resukisu.ui.component.pinnedScrollBehavior
+import com.resukisu.resukisu.ui.component.SwipeableSnackbarHost
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Navigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.FlashIt
 import com.resukisu.resukisu.ui.screen.LabelText
-import com.resukisu.resukisu.ui.theme.ThemeConfig
-import com.resukisu.resukisu.ui.theme.getCardColors
-import com.resukisu.resukisu.ui.theme.getCardElevation
+import com.resukisu.resukisu.ui.theme.CardConfig
+import com.resukisu.resukisu.ui.theme.blurSource
+import com.resukisu.resukisu.ui.util.LocalPermissionRequestInterface
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
-import com.resukisu.resukisu.ui.util.download
+import com.resukisu.resukisu.ui.util.downloader.download
 import com.resukisu.resukisu.ui.util.module.ReleaseAssetInfo
 import com.resukisu.resukisu.ui.util.module.ReleaseInfo
 import com.resukisu.resukisu.ui.viewmodel.ModuleRepoViewModel
 import com.resukisu.resukisu.ui.viewmodel.ModuleRepoViewModel.RepoModule
 import com.resukisu.resukisu.ui.viewmodel.formatFileSize
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -125,17 +126,18 @@ import kotlinx.coroutines.withContext
  * @date 2025/12/6
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Destination<RootGraph>
 @Composable
-fun ModuleRepoScreen(navigator: DestinationsNavigator) {
+fun ModuleRepoScreen() {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("settings", MODE_PRIVATE)
     val viewModel = viewModel<ModuleRepoViewModel>()
     val snackBarHost = LocalSnackbarHost.current
-    val scrollBehavior = pinnedScrollBehavior()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val currentModuleForChooseDialog = remember { mutableStateOf<RepoModule?>(null) }
     val chooseDialog = rememberCustomDialog({ dismiss ->
-        ChooseDialogContent(currentModuleForChooseDialog, navigator, viewModel,dismiss)
+        ChooseDialogContent(currentModuleForChooseDialog, viewModel, dismiss)
     })
     val confirmDialog = rememberConfirmDialog()
     val bottomSheetState = rememberModalBottomSheetState(
@@ -146,10 +148,11 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
     val pullRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(Unit) {
+        scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
+
         viewModel.sortStargazerCountFirst = prefs.getBoolean("module_repo_sort_star_first", false)
     }
 
-    val hazeState = if (ThemeConfig.backgroundImageLoaded) rememberHazeState() else null
     val isLoading = viewModel.modules.isEmpty()
 
     Scaffold(
@@ -158,6 +161,7 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
                 modifier = if (isLoading) Modifier.background(MaterialTheme.colorScheme.surfaceContainer.copy(
                     alpha = 0.8f
                 )) else Modifier,
+                title = stringResource(R.string.module_repo),
                 searchText = viewModel.search,
                 onSearchTextChange = { viewModel.search = it },
                 dropdownContent = {
@@ -171,11 +175,10 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
                     }
                 },
                 onBackClick = {
-                    navigator.popBackStack()
+                    navigator.pop()
                 },
                 scrollBehavior = scrollBehavior,
                 searchBarPlaceHolderText = stringResource(R.string.search_modules),
-                hazeState = hazeState
             )
         },
         containerColor = Color.Transparent,
@@ -183,7 +186,7 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
         contentWindowInsets = WindowInsets.safeDrawing.only(
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         ),
-        snackbarHost = { SnackbarHost(hostState = snackBarHost) }
+        snackbarHost = { SwipeableSnackbarHost(hostState = snackBarHost) }
     ) { innerPadding ->
         var offline by remember { mutableStateOf(!isNetworkAvailable(context)) }
 
@@ -241,7 +244,7 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
             }
         } else {
             PullToRefreshBox(
-                modifier = if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier,
+                modifier = Modifier.blurSource(),
                 state = pullRefreshState,
                 isRefreshing = viewModel.isRefreshing,
                 onRefresh = {
@@ -251,28 +254,37 @@ fun ModuleRepoScreen(navigator: DestinationsNavigator) {
                     PullToRefreshDefaults.LoadingIndicator(
                         state = pullRefreshState,
                         isRefreshing = viewModel.isRefreshing,
-                        modifier = Modifier.padding(top = innerPadding.calculateTopPadding()).align(Alignment.TopCenter),
+                        modifier = Modifier
+                            .padding(top = innerPadding.calculateTopPadding())
+                            .align(Alignment.TopCenter),
                     )
                 }
             ) {
                 LazyColumn(
                     state = rememberLazyListState(),
                     modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = remember {
                         PaddingValues(
                             start = 16.dp,
-                            top = 16.dp,
+                            top = 0.dp,
                             end = 16.dp,
-                            bottom = 16.dp + 56.dp + 16.dp + 48.dp + 6.dp /* Scaffold Fab Spacing + Fab container height + SnackBar height */
+                            bottom = 0.dp
                         )
                     }
                 ) {
                     item {
                         Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding()))
                     }
+
                     items(viewModel.modules) { module ->
-                        OnlineModuleItem(navigator, module, viewModel, confirmDialog, chooseDialog, currentModuleForChooseDialog)
+                        OnlineModuleItem(
+                            module,
+                            viewModel,
+                            confirmDialog,
+                            chooseDialog,
+                            currentModuleForChooseDialog
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                     item {
                         Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding()))
@@ -369,6 +381,23 @@ private fun ModuleRepoBottomSheetContent(
                             bottomSheetState.hide()
                             onDismiss()
                         }
+                    },
+                    thumbContent = {
+                        if (viewModel.sortStargazerCountFirst) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(SwitchDefaults.IconSize),
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                modifier = Modifier.size(SwitchDefaults.IconSize),
+                            )
+                        }
                     }
                 )
             }
@@ -378,7 +407,6 @@ private fun ModuleRepoBottomSheetContent(
 
 @Composable
 fun OnlineModuleItem(
-    navigator: DestinationsNavigator,
     module: RepoModule,
     viewModel: ModuleRepoViewModel,
     confirmDialog: ConfirmDialogHandle,
@@ -386,13 +414,16 @@ fun OnlineModuleItem(
     currentModuleForChooseDialog: MutableState<RepoModule?>
 ) {
     val context = LocalContext.current
+    val permissionRequestInterface = LocalPermissionRequestInterface.current
+    val navigator = LocalNavigator.current
 
-    ElevatedCard(
-        colors = getCardColors(MaterialTheme.colorScheme.surfaceContainerHighest),
-        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable {
-            navigator.navigate(OnlineModuleDetailScreenDestination(module))
-        },
-        elevation = getCardElevation(),
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(CardConfig.cardAlpha),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .clickable {
+                navigator.push(Route.ModuleRepoDetail(module))
+            },
     ) {
         Column(
             modifier = Modifier.padding(22.dp, 18.dp, 22.dp, 12.dp)
@@ -417,7 +448,9 @@ fun OnlineModuleItem(
                             text = module.moduleName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                            modifier = Modifier
+                                .weight(1f)
+                                .horizontalScroll(rememberScrollState()),
                             softWrap = true,
                             maxLines = 1
                         )
@@ -480,20 +513,17 @@ fun OnlineModuleItem(
                 LabelText(
                     label = module.moduleId,
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
                 if (module.metamodule) {
                     LabelText(
                         label = "META",
                         containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary
                     )
                 }
                 if (module.installed) {
                     LabelText(
                         label = stringResource(R.string.installed),
                         containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = MaterialTheme.colorScheme.onSecondary
                     )
                 }
             }
@@ -509,7 +539,7 @@ fun OnlineModuleItem(
                     FilledTonalButton(
                         modifier = Modifier.defaultMinSize(minWidth = 52.dp, minHeight = 32.dp),
                         onClick = {
-                            navigator.navigate(OnlineModuleDetailScreenDestination(module))
+                            navigator.push(Route.ModuleRepoDetail(module))
                         },
                         contentPadding = ButtonDefaults.TextButtonContentPadding,
                     ) {
@@ -541,6 +571,7 @@ fun OnlineModuleItem(
                                         assets.firstOrNull()?.let { asset ->
                                             downloadAssetAndInstall(
                                                 context,
+                                                permissionRequestInterface,
                                                 module,
                                                 asset,
                                                 navigator,
@@ -570,23 +601,23 @@ fun OnlineModuleItem(
 
 fun downloadAssetAndInstall(
     context: Context,
+    permissionRequestInterface: PermissionRequestInterface,
     module: RepoModule,
     asset: ReleaseAssetInfo,
-    navigator: DestinationsNavigator,
+    navigator: Navigator,
     coroutineScope: CoroutineScope
 ) {
     val downloadingText = context.getText(R.string.module_downloading).toString()
-    val downloadErrorText = context.getText(R.string.module_download_error).toString()
     coroutineScope.launch {
         withContext(Dispatchers.IO) {
             download(
-                context,
-                asset.downloadUrl,
-                asset.name,
-                downloadingText.format(module.moduleName),
+                context = context,
+                permissionRequestInterface = permissionRequestInterface,
+                url = asset.downloadUrl,
+                fileName = asset.name,
                 onDownloaded = { uri ->
-                    navigator.navigate(
-                        FlashScreenDestination(
+                    navigator.push(
+                        Route.Flash(
                             FlashIt.FlashModule(uri)
                         )
                     )
@@ -596,12 +627,6 @@ fun downloadAssetAndInstall(
                         Toast.makeText(context, downloadingText.format(module.moduleName), Toast.LENGTH_SHORT).show()
                     }
                 },
-                onError = { errorMsg ->
-                    launch(Dispatchers.Main) {
-                        Toast.makeText(context, "$downloadErrorText: $errorMsg", Toast.LENGTH_LONG)
-                            .show()
-                    }
-                }
             )
         }
     }
@@ -610,11 +635,12 @@ fun downloadAssetAndInstall(
 @Composable
 fun ChooseDialogContent(
     currentModuleForChooseDialog: MutableState<RepoModule?>,
-    navigator: DestinationsNavigator,
     viewModel: ModuleRepoViewModel,
     dismiss: () -> Unit
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
+    val permissionRequestInterface = LocalPermissionRequestInterface.current
     val module = currentModuleForChooseDialog.value
     if (module == null || module.latestAsset == null) {
         dismiss()
@@ -697,7 +723,14 @@ fun ChooseDialogContent(
                             }
                             selectedAsset?.let { selected ->
                                 dismiss()
-                                downloadAssetAndInstall(context,module,selected, navigator, viewModel.viewModelScope)
+                                downloadAssetAndInstall(
+                                    context = context,
+                                    permissionRequestInterface = permissionRequestInterface,
+                                    module = module,
+                                    asset = selected,
+                                    navigator = navigator,
+                                    coroutineScope = viewModel.viewModelScope
+                                )
                             }
                         }
                     ) {
@@ -769,14 +802,32 @@ fun initFakeRepoModuleForPreview() : RepoModule {
 fun OnlineModuleItemPreview() {
     val currentModuleForChooseDialog = remember { mutableStateOf<RepoModule?>(null) }
 
-    OnlineModuleItem(
-        EmptyDestinationsNavigator,
-        initFakeRepoModuleForPreview(),
-        viewModel<ModuleRepoViewModel>(),
-        rememberConfirmDialog(),
-        rememberCustomDialog { },
-        currentModuleForChooseDialog,
-    )
+    CompositionLocalProvider(
+        LocalNavigator provides Navigator(Route.ModuleRepo),
+        LocalPermissionRequestInterface provides object : PermissionRequestInterface {
+            override fun requestPermission(
+                permission: String,
+                callback: (Boolean) -> Unit,
+                requestDescription: String
+            ) {
+            }
+
+            override fun requestPermissions(
+                permissions: Array<String>,
+                callback: (Map<String, @JvmSuppressWildcards Boolean>) -> Unit,
+                requestDescription: Map<String, String>
+            ) {
+            }
+        }
+    ) {
+        OnlineModuleItem(
+            initFakeRepoModuleForPreview(),
+            viewModel<ModuleRepoViewModel>(),
+            rememberConfirmDialog(),
+            rememberCustomDialog { },
+            currentModuleForChooseDialog,
+        )
+    }
 }
 
 @Preview(locale = "zh-rCN", showBackground = true)
@@ -784,5 +835,24 @@ fun OnlineModuleItemPreview() {
 fun ChooseDialogPreview() {
     val currentModuleForChooseDialog = remember { mutableStateOf<RepoModule?>(initFakeRepoModuleForPreview()) }
 
-    ChooseDialogContent(currentModuleForChooseDialog, EmptyDestinationsNavigator, viewModel<ModuleRepoViewModel>()) {}
+    CompositionLocalProvider(
+        LocalNavigator provides Navigator(Route.ModuleRepo),
+        LocalPermissionRequestInterface provides object : PermissionRequestInterface {
+            override fun requestPermission(
+                permission: String,
+                callback: (Boolean) -> Unit,
+                requestDescription: String
+            ) {
+            }
+
+            override fun requestPermissions(
+                permissions: Array<String>,
+                callback: (Map<String, @JvmSuppressWildcards Boolean>) -> Unit,
+                requestDescription: Map<String, String>
+            ) {
+            }
+        }
+    ) {
+        ChooseDialogContent(currentModuleForChooseDialog, viewModel<ModuleRepoViewModel>()) {}
+    }
 }

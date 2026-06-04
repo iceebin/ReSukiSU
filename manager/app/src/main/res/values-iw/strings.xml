@@ -29,10 +29,8 @@
     <string name="safe_mode">מצב בטוח</string>
     <string name="reboot_recovery">הפעלה מחדש לריקברי</string>
     <string name="reboot_userspace">רך Reboot</string>
-    <string name="profile_name">שם פרופיל</string>
     <string name="home_support_content">KernelSU הוא, ותמיד יהיה, חינמי וקוד פתוח. עם זאת, תוכל להראות לנו שאכפת לך על ידי תרומה.</string>
     <string name="uninstall">הסרה</string>
-    <string name="module_install">התקנה</string>
     <string name="home_click_to_install">לחץ להתקנה</string>
     <string name="profile_selinux_rules">כללים</string>
     <string name="profile_groups">קבוצה</string>
@@ -65,7 +63,6 @@
     <string name="home_kernel">Kernel</string>
     <string name="home_not_installed">לא מותקן</string>
     <string name="failed_to_update_app_profile">נכשל עדכון פרופיל האפליקציה עבור %s</string>
-    <string name="home_learn_kernelsu_url">https://kernelsu.org/guide/what-is-kernelsu.html</string>
     <string name="failed_to_update_sepolicy">נכשל עדכון כללי SELinux עבור: %s</string>
     <string name="reboot_bootloader">הפעלה מחדש לבוטלאודר</string>
     <string name="home_manager_version">גרסת מנהל</string>

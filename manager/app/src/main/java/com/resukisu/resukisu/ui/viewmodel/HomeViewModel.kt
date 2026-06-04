@@ -14,7 +14,7 @@ import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.getKernelVersion
 import com.resukisu.resukisu.ksuApp
 import com.resukisu.resukisu.ui.susfs.util.SuSFSManager
-import com.resukisu.resukisu.ui.util.checkNewVersion
+import com.resukisu.resukisu.ui.util.downloader.checkNewVersion
 import com.resukisu.resukisu.ui.util.getKpmModuleCount
 import com.resukisu.resukisu.ui.util.getKpmVersion
 import com.resukisu.resukisu.ui.util.getMetaModuleImplement
@@ -25,6 +25,8 @@ import com.resukisu.resukisu.ui.util.getSuSFSStatus
 import com.resukisu.resukisu.ui.util.getSuSFSVersion
 import com.resukisu.resukisu.ui.util.getSuperuserCount
 import com.resukisu.resukisu.ui.util.getZygiskImplement
+import com.resukisu.resukisu.ui.util.isOfficialSignature
+import com.resukisu.resukisu.ui.util.isSELinuxPermissive
 import com.resukisu.resukisu.ui.util.module.LatestVersionInfo
 import com.resukisu.resukisu.ui.util.rootAvailable
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +45,10 @@ class HomeViewModel : ViewModel() {
         val kernelVersion: KernelVersion = getKernelVersion(),
         val isRootAvailable: Boolean = false,
         val isKpmConfigured: Boolean = false,
-        val requireNewKernel: Boolean = false
+        val requireNewKernel: Boolean = false,
+        val isSELinuxPermissive: Boolean = false,
+        val isOfficialSignature: Boolean = true,
+        val kernelPatchImplement: Natives.KernelPatchImplement = Natives.KernelPatchImplement.NO_KERNEL_PATCH_SUPPORT,
     )
 
     // 系统信息
@@ -64,7 +69,8 @@ class HomeViewModel : ViewModel() {
         val managersList: Natives.ManagersList? = null,
         val isDynamicSignEnabled: Boolean = false,
         val zygiskImplement: String = "",
-        val metaModuleImplement: String = ""
+        val metaModuleImplement: String = "",
+        val seccompStatus: Int = -1,
     )
 
     // 状态变量
@@ -78,8 +84,6 @@ class HomeViewModel : ViewModel() {
         private set
 
     var isSimpleMode by mutableStateOf(false)
-        private set
-    var isKernelSimpleMode by mutableStateOf(false)
         private set
     var isHideVersion by mutableStateOf(false)
         private set
@@ -109,7 +113,6 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val settingsPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
             isSimpleMode = settingsPrefs.getBoolean("is_simple_mode", false)
-            isKernelSimpleMode = settingsPrefs.getBoolean("is_kernel_simple_mode", false)
             isHideVersion = settingsPrefs.getBoolean("is_hide_version", false)
             isHideOtherInfo = settingsPrefs.getBoolean("is_hide_other_info", false)
             isHideSusfsStatus = settingsPrefs.getBoolean("is_hide_susfs_status", false)
@@ -140,28 +143,6 @@ class HomeViewModel : ViewModel() {
                     "Unknown"
                 }
 
-                val ksuFullVersion = if (isKernelSimpleMode) {
-                    try {
-                        val startIndex = fullVersion.indexOf('v')
-                        if (startIndex >= 0) {
-                            val endIndex = fullVersion.indexOf('-', startIndex)
-                            val versionStr = if (endIndex > startIndex) {
-                                fullVersion.substring(startIndex, endIndex)
-                            } else {
-                                fullVersion.substring(startIndex)
-                            }
-                            val numericVersion = "v" + (Regex("""\d+(\.\d+)*""").find(versionStr)?.value ?: versionStr)
-                            numericVersion
-                        } else {
-                            fullVersion
-                        }
-                    } catch (_: Exception) {
-                        fullVersion
-                    }
-                } else {
-                    fullVersion
-                }
-
                 val lkmMode = ksuVersion?.let {
                     if (kernelVersion.isGKI()) Natives.isLkmMode else null
                 }
@@ -184,15 +165,30 @@ class HomeViewModel : ViewModel() {
                     false
                 }
 
+                val isSELinuxPermissive = try {
+                    isSELinuxPermissive()
+                } catch (_: Exception) {
+                    false
+                }
+
+                val isOfficialSignature = try {
+                    isOfficialSignature()
+                } catch (_: Exception) {
+                    false
+                }
+
                 systemStatus = SystemStatus(
                     isManager = isManager,
                     ksuVersion = ksuVersion,
-                    ksuFullVersion = ksuFullVersion,
+                    ksuFullVersion = "$fullVersion (${Natives.version})",
                     lkmMode = lkmMode,
                     kernelVersion = kernelVersion,
                     isRootAvailable = isRootAvailable,
                     isKpmConfigured = isKpmConfigured,
-                    requireNewKernel = requireNewKernel
+                    requireNewKernel = requireNewKernel,
+                    isSELinuxPermissive = isSELinuxPermissive,
+                    isOfficialSignature = isOfficialSignature,
+                    kernelPatchImplement = Natives.getKernelPatchImplement(),
                 )
 
                 isCoreDataLoaded = true
@@ -207,13 +203,16 @@ class HomeViewModel : ViewModel() {
 
         val job = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val basicInfo = loadBasicSystemInfo(context)
+                val (kernelRelease, androidVersion, deviceModel, managerVersion, selinuxStatus, seccompStatus) = loadBasicSystemInfo(
+                    context
+                )
                 systemInfo = systemInfo.copy(
-                    kernelRelease = basicInfo.first,
-                    androidVersion = basicInfo.second,
-                    deviceModel = basicInfo.third,
-                    managerVersion = basicInfo.fourth,
-                    selinuxStatus = basicInfo.fifth
+                    kernelRelease = kernelRelease,
+                    androidVersion = androidVersion,
+                    deviceModel = deviceModel,
+                    managerVersion = managerVersion,
+                    selinuxStatus = selinuxStatus,
+                    seccompStatus = seccompStatus
                 )
 
                 if (!isSimpleMode) {
@@ -300,7 +299,7 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private suspend fun loadBasicSystemInfo(context: Context): Tuple5<String, String, String, Pair<String, Long>, String> {
+    private suspend fun loadBasicSystemInfo(context: Context): Tuple6<String, String, String, Pair<String, Long>, String, Int> {
         return withContext(Dispatchers.IO) {
             val uname = try {
                 Os.uname()
@@ -320,18 +319,23 @@ class HomeViewModel : ViewModel() {
                 Pair("Unknown", 0L)
             }
 
-            val seLinuxStatus = try {
+            val selinuxStatus = try {
                 getSELinuxStatus(ksuApp.applicationContext)
             } catch (_: Exception) {
                 "Unknown"
             }
 
-            Tuple5(
+            val seccompStatus = runCatching {
+                Os.prctl(21 /* PR_GET_SECCOMP */, 0, 0, 0, 0)
+            }.getOrDefault(-1)
+
+            Tuple6(
                 uname?.release ?: "Unknown",
                 Build.VERSION.RELEASE ?: "Unknown",
                 deviceModel,
                 managerVersion,
-                seLinuxStatus
+                selinuxStatus,
+                seccompStatus
             )
         }
     }
@@ -511,13 +515,6 @@ class HomeViewModel : ViewModel() {
         val third: T3,
         val fourth: T4,
         val fifth: T5
-    )
-
-    data class Tuple4<T1, T2, T3, T4>(
-        val first: T1,
-        val second: T2,
-        val third: T3,
-        val fourth: T4
     )
 
     override fun onCleared() {

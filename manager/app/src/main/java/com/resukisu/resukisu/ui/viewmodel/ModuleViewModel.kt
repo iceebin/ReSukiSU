@@ -14,6 +14,7 @@ import com.resukisu.resukisu.ksuApp
 import com.resukisu.resukisu.ui.util.HanziToPinyin
 import com.resukisu.resukisu.ui.util.getRootShell
 import com.resukisu.resukisu.ui.util.listModules
+import com.topjohnwu.superuser.io.SuFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -124,9 +125,8 @@ class ModuleViewModel : ViewModel() {
         }
     }
 
-    val haveWebuiModuleList by derivedStateOf {
-        moduleList.filter { it.hasWebUi }
-    }
+    var hasModuleRequireMount by mutableStateOf(false)
+        private set
 
     var isNeedRefresh by mutableStateOf(false)
         private set
@@ -136,7 +136,8 @@ class ModuleViewModel : ViewModel() {
     }
 
     fun fetchModuleList(
-        manualRefresh: Boolean = false
+        manualRefresh: Boolean = false,
+        callBack: () -> Unit = {},
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             isRefreshing = true
@@ -190,6 +191,18 @@ class ModuleViewModel : ViewModel() {
                         )
                     }.toList()
 
+                hasModuleRequireMount = modules.map { module ->
+                    async(Dispatchers.IO) {
+                        SuFile.open("/data/adb/modules/${module.id}/system").exists()
+                                && !SuFile.open("/data/adb/modules/${module.id}/skip_mount")
+                            .exists() // skip_mount
+                                && !SuFile.open("/data/adb/modules/${module.id}/disable")
+                            .exists() // disable
+                                && !SuFile.open("/data/adb/modules/${module.id}/remove")
+                            .exists() // remove
+                    }
+                }.awaitAll().any { it }
+
                 modules = modules.map { module ->
                     async(Dispatchers.IO) {
                         module.copy(
@@ -199,6 +212,8 @@ class ModuleViewModel : ViewModel() {
                         )
                     }
                 }.awaitAll()
+
+
 
                 isNeedRefresh = false
             }.onFailure { e ->
@@ -213,6 +228,7 @@ class ModuleViewModel : ViewModel() {
             }
 
             Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, modules: $modules")
+            callBack()
         }
     }
 
@@ -269,32 +285,6 @@ class ModuleViewModel : ViewModel() {
 
         return ModuleUpdateInfo(zipUrl, version, changelog)
     }
-}
-
-fun ModuleViewModel.ModuleInfo.copy(
-    id: String = this.id,
-    name: String = this.name,
-    author: String = this.author,
-    version: String = this.version,
-    versionCode: Int = this.versionCode,
-    description: String = this.description,
-    enabled: Boolean = this.enabled,
-    update: Boolean = this.update,
-    remove: Boolean = this.remove,
-    updateJson: String = this.updateJson,
-    hasWebUi: Boolean = this.hasWebUi,
-    hasActionScript: Boolean = this.hasActionScript,
-    metamodule: Boolean = this.metamodule,
-    actionIconPath: String? = this.actionIconPath,
-    webUiIconPath: String? = this.webUiIconPath,
-    dirId: String = this.dirId,
-    moduleUpdate: ModuleViewModel.ModuleUpdateInfo? = this.moduleUpdate,
-): ModuleViewModel.ModuleInfo {
-    return ModuleViewModel.ModuleInfo(
-        id, name, author, version, versionCode, description,
-        enabled, update, remove, updateJson, hasWebUi, hasActionScript, metamodule,
-        actionIconPath, webUiIconPath, dirId, moduleUpdate
-    )
 }
 
 private fun JSONObject.getBooleanCompat(key: String, default: Boolean = false): Boolean {

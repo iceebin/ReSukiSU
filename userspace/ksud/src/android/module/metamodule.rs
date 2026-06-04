@@ -70,6 +70,15 @@ pub fn get_metamodule_path() -> Option<PathBuf> {
     result
 }
 
+/// Get Metamodule Id
+pub fn get_metamodule_id() -> Option<String> {
+    get_metamodule_path().and_then(|path| {
+        path.file_name()
+            .and_then(|os_str| os_str.to_str())
+            .map(ToString::to_string)
+    })
+}
+
 /// Check if metamodule exists
 pub fn has_metamodule() -> bool {
     get_metamodule_path().is_some()
@@ -226,13 +235,15 @@ pub fn exec_metauninstall_script(module_id: &str) -> Result<()> {
         return Ok(());
     };
 
-    info!("Executing metamodule metauninstall.sh for module: {module_id}",);
+    info!("Executing metamodule metauninstall.sh for module: {module_id}");
 
     let mut command = Command::new(assets::BUSYBOX_PATH);
     command
         .args(["sh", metauninstall_path.to_str().unwrap()])
         .current_dir(metauninstall_path.parent().unwrap())
-        .envs(crate::android::module::get_common_script_envs())
+        .envs(crate::android::module::get_common_script_envs(
+            get_metamodule_id().as_deref(),
+        ))
         .env("MODULE_ID", module_id);
     if fs::exists(defs::METAMODULE_DEBUG)? {
         command
@@ -252,7 +263,7 @@ pub fn exec_metauninstall_script(module_id: &str) -> Result<()> {
         "Metamodule metauninstall.sh failed for module {module_id}",
     );
 
-    info!("Metamodule metauninstall.sh executed successfully for {module_id}",);
+    info!("Metamodule metauninstall.sh executed successfully for {module_id}");
     Ok(())
 }
 
@@ -267,7 +278,9 @@ pub fn exec_mount_script(module_dir: &str) -> Result<()> {
     let mut command = Command::new(assets::BUSYBOX_PATH);
     command
         .args(["sh", mount_script.to_str().unwrap()])
-        .envs(crate::android::module::get_common_script_envs())
+        .envs(crate::android::module::get_common_script_envs(
+            get_metamodule_id().as_deref(),
+        ))
         .env("MODULE_DIR", module_dir);
 
     if fs::exists(defs::METAMODULE_DEBUG)? {
@@ -283,7 +296,7 @@ pub fn exec_mount_script(module_dir: &str) -> Result<()> {
     }
     let result = command.status()?;
 
-    ensure!(result.success(), "Metamodule mount script failed",);
+    ensure!(result.success(), "Metamodule mount script failed");
 
     info!("Metamodule mount script executed successfully");
     Ok(())

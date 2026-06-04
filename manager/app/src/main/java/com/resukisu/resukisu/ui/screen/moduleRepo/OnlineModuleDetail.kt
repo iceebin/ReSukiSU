@@ -40,8 +40,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -53,13 +51,13 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,29 +78,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.navigation.EmptyDestinationsNavigator
 import com.resukisu.resukisu.R
+import com.resukisu.resukisu.ui.activity.PermissionRequestInterface
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.GithubMarkdown
+import com.resukisu.resukisu.ui.component.SwipeableSnackbarHost
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
+import com.resukisu.resukisu.ui.component.settings.SegmentedColumn
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
-import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Navigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeConfig
+import com.resukisu.resukisu.ui.theme.blurEffect
+import com.resukisu.resukisu.ui.theme.blurSource
+import com.resukisu.resukisu.ui.util.LocalPermissionRequestInterface
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.module.ReleaseAssetInfo
 import com.resukisu.resukisu.ui.util.module.ReleaseInfo
 import com.resukisu.resukisu.ui.viewmodel.ModuleRepoViewModel
 import com.resukisu.resukisu.ui.viewmodel.formatFileSize
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -111,9 +108,9 @@ import kotlinx.coroutines.launch
  * @date 2025/12/7
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Destination<RootGraph>
 @Composable
-fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRepoViewModel.RepoModule) {
+fun OnlineModuleDetailScreen(module: ModuleRepoViewModel.RepoModule) {
+    val navigator = LocalNavigator.current
     val snackBarHost = LocalSnackbarHost.current
     val topAppBarState = rememberTopAppBarState()
     val coroutineScope = rememberCoroutineScope()
@@ -122,7 +119,6 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
     val tabTitles = listOf(stringResource(R.string.readme), stringResource(R.string.release), stringResource(R.string.info))
     val uriHandler = LocalUriHandler.current
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
-    val hazeState = if (ThemeConfig.backgroundImageLoaded) rememberHazeState() else null
 
     LaunchedEffect(Unit) {
         scrollBehavior.state.heightOffset =
@@ -131,26 +127,9 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
 
     Scaffold(
         topBar = {
-            val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
-                backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-                    alpha = 0.8f
-                ),
-                tint = HazeTint(Color.Transparent)
-            ) else null
-
-            val collapsedFraction = scrollBehavior.state.collapsedFraction
-            val modifier = if (ThemeConfig.backgroundImageLoaded && hazeStyle != null && hazeState != null) {
-                Modifier.hazeEffect(hazeState) {
-                    style = hazeStyle
-                    noiseFactor = 0f
-                    blurRadius = 30.dp
-                    alpha = collapsedFraction
-                }
-            }
-            else Modifier
-
             Column(
-                modifier = modifier
+                modifier = Modifier.blurEffect(
+                )
             ) {
                 LargeFlexibleTopAppBar(
                     title = { Text(module.moduleName) },
@@ -158,7 +137,7 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
                     navigationIcon = {
                         AppBackButton(
                             onClick = {
-                                navigator.popBackStack()
+                                navigator.pop()
                             }
                         )
                     },
@@ -176,11 +155,15 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
                     },
                     colors = TopAppBarDefaults.topAppBarColors().copy(
                         containerColor =
-                            if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                            else MaterialTheme.colorScheme.surfaceContainer,
+                            if (ThemeConfig.isEnableBlur)
+                                Color.Transparent
+                            else
+                                MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                         scrolledContainerColor =
-                            if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                            else MaterialTheme.colorScheme.surfaceContainer
+                            if (ThemeConfig.isEnableBlur)
+                                Color.Transparent
+                            else
+                                MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha)
                     ),
                     windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
                 )
@@ -188,8 +171,10 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
                 PrimaryTabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     tabTitles.forEachIndexed { index, title ->
@@ -220,11 +205,14 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
         contentWindowInsets = WindowInsets.safeDrawing.only(
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         ),
-        snackbarHost = { SnackbarHost(hostState = snackBarHost) }
+        snackbarHost = { SwipeableSnackbarHost(hostState = snackBarHost) }
     ) { innerPadding ->
-        Column(modifier = if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .blurSource()
+        ) {
 
             HorizontalPager(
                 state = pagerState,
@@ -232,7 +220,12 @@ fun OnlineModuleDetailScreen(navigator: DestinationsNavigator, module: ModuleRep
             ) { page ->
                 when (page) {
                     0 -> ReadmeTab(module, scrollBehavior.nestedScrollConnection, innerPadding.calculateTopPadding())
-                    1 -> ReleasesTab(module, scrollBehavior.nestedScrollConnection, coroutineScope, navigator, innerPadding.calculateTopPadding())
+                    1 -> ReleasesTab(
+                        module,
+                        scrollBehavior.nestedScrollConnection,
+                        coroutineScope,
+                        innerPadding.calculateTopPadding()
+                    )
                     2 -> InfoTab(module, scrollBehavior.nestedScrollConnection, innerPadding.calculateTopPadding())
                 }
             }
@@ -258,7 +251,7 @@ fun InfoTab(
             Spacer(Modifier.height(topPadding))
         }
         item {
-            SplicedColumnGroup(
+            SegmentedColumn(
                 title = stringResource(R.string.author)
             ) {
                 module.authorList.forEach { author ->
@@ -282,7 +275,7 @@ fun InfoTab(
         }
 
         item {
-            SplicedColumnGroup(
+            SegmentedColumn(
                 title = stringResource(R.string.source_code)
             ) {
                 item {
@@ -304,7 +297,6 @@ fun ReleasesTab(
     module: ModuleRepoViewModel.RepoModule,
     nestedScrollConnection: NestedScrollConnection,
     coroutineScope: CoroutineScope,
-    navigator: DestinationsNavigator,
     topPadding: Dp
 ) {
     LazyColumn(
@@ -320,7 +312,7 @@ fun ReleasesTab(
             items = module.releases,
             key = { it.tagName }
         ) {
-            ReleaseCard(module, it, coroutineScope, navigator)
+            ReleaseCard(module, it, coroutineScope)
         }
     }
 }
@@ -390,23 +382,26 @@ fun ReadmeTab(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ReleaseCard(module: ModuleRepoViewModel.RepoModule, release: ReleaseInfo, coroutineScope: CoroutineScope, navigator: DestinationsNavigator) {
+fun ReleaseCard(
+    module: ModuleRepoViewModel.RepoModule,
+    release: ReleaseInfo,
+    coroutineScope: CoroutineScope
+) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
+    val permissionRequestInterface = LocalPermissionRequestInterface.current
     val confirmInstallTitle =
         stringResource(R.string.confirm_install_module_title, module.moduleName)
     val confirmDialog = rememberConfirmDialog()
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = 12.dp),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(4.dp),
-        colors = CardDefaults.cardColors().copy(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
-                alpha = CardConfig.cardAlpha
-            )
-        )
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
+            alpha = CardConfig.cardAlpha
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -449,7 +444,7 @@ fun ReleaseCard(module: ModuleRepoViewModel.RepoModule, release: ReleaseInfo, co
                     bottom = 5.dp
                 )
             )
-            if (release.assets.isEmpty()) return@Card
+            if (release.assets.isEmpty()) return@Surface
 
             Column {
                 release.assets.forEach { assetInfo ->
@@ -465,6 +460,7 @@ fun ReleaseCard(module: ModuleRepoViewModel.RepoModule, release: ReleaseInfo, co
 
                             downloadAssetAndInstall(
                                 context,
+                                permissionRequestInterface,
                                 module,
                                 assetInfo,
                                 navigator,
@@ -475,7 +471,6 @@ fun ReleaseCard(module: ModuleRepoViewModel.RepoModule, release: ReleaseInfo, co
                     SettingsBaseWidget(
                         modifier = Modifier.clip(RoundedCornerShape(12.dp)),
                         title = assetInfo.name,
-                        noVerticalPadding = true,
                         onClick = {
                             onClick()
                         },
@@ -576,5 +571,27 @@ fun ReleaseCardPreview() {
             )
         }
     )
-    ReleaseCard(initFakeRepoModuleForPreview(),release, rememberCoroutineScope(), EmptyDestinationsNavigator)
+
+    val fakeModule = initFakeRepoModuleForPreview()
+
+    CompositionLocalProvider(
+        LocalNavigator provides Navigator(Route.ModuleRepoDetail(fakeModule)),
+        LocalPermissionRequestInterface provides object : PermissionRequestInterface {
+            override fun requestPermission(
+                permission: String,
+                callback: (Boolean) -> Unit,
+                requestDescription: String
+            ) {
+            }
+
+            override fun requestPermissions(
+                permissions: Array<String>,
+                callback: (Map<String, @JvmSuppressWildcards Boolean>) -> Unit,
+                requestDescription: Map<String, String>
+            ) {
+            }
+        },
+    ) {
+        ReleaseCard(fakeModule, release, rememberCoroutineScope())
+    }
 }

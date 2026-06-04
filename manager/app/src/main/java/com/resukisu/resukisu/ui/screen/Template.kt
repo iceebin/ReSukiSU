@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
@@ -37,11 +37,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,30 +57,23 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.getSystemService
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.TemplateEditorScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.result.ResultRecipient
-import com.ramcosta.composedestinations.result.getOr
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsJumpPageWidget
-import com.resukisu.resukisu.ui.component.settings.splicedLazyColumnGroup
+import com.resukisu.resukisu.ui.component.settings.lazySegmentColumn
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Navigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeConfig
+import com.resukisu.resukisu.ui.theme.blurEffect
+import com.resukisu.resukisu.ui.theme.blurSource
 import com.resukisu.resukisu.ui.viewmodel.TemplateViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -88,28 +83,27 @@ import kotlinx.coroutines.launch
  */
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Destination<RootGraph>
 @Composable
-fun AppProfileTemplateScreen(
-    navigator: DestinationsNavigator,
-    resultRecipient: ResultRecipient<TemplateEditorScreenDestination, Boolean>
-) {
+fun AppProfileTemplateScreen() {
     val pullRefreshState = rememberPullToRefreshState()
     val viewModel = viewModel<TemplateViewModel>()
     val scope = rememberCoroutineScope()
     val scrollBehavior =
         TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-    val hazeState = if (CardConfig.isCustomBackgroundEnabled) rememberHazeState() else null
+    val navigator = LocalNavigator.current
+
     LaunchedEffect(Unit) {
+        scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
+
         if (viewModel.templateList.isEmpty()) {
             viewModel.fetchTemplates()
         }
-    }
 
-    // handle result from TemplateEditorScreen, refresh if needed
-    resultRecipient.onNavResult { result ->
-        if (result.getOr { false }) {
-            scope.launch { viewModel.fetchTemplates() }
+        navigator.observeResult<Boolean>("template_edit").collect { success ->
+            if (success) {
+                navigator.clearResult("template_edit")
+                scope.launch { viewModel.fetchTemplates() }
+            }
         }
     }
 
@@ -122,8 +116,14 @@ fun AppProfileTemplateScreen(
                     Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 }
             }
+            val appProfileTemplateImportEmpty =
+                stringResource(R.string.app_profile_template_import_empty)
+            val appProfileTemplateImportSuccess =
+                stringResource(R.string.app_profile_template_import_success)
+            val appProfileTemplateExportEmpty =
+                stringResource(R.string.app_profile_template_export_empty)
             TopBar(
-                onBack = dropUnlessResumed { navigator.popBackStack() },
+                onBack = dropUnlessResumed { navigator.pop() },
                 onSync = {
                     scope.launch { viewModel.fetchTemplates(true) }
                 },
@@ -131,13 +131,13 @@ fun AppProfileTemplateScreen(
                     scope.launch {
                         val clipboardText = clipboardManager?.primaryClip?.getItemAt(0)?.text?.toString()
                         if (clipboardText.isNullOrEmpty()) {
-                            showToast(context.getString(R.string.app_profile_template_import_empty))
+                            showToast(appProfileTemplateImportEmpty)
                             return@launch
                         }
                         viewModel.importTemplates(
                             clipboardText,
                             {
-                                showToast(context.getString(R.string.app_profile_template_import_success))
+                                showToast(appProfileTemplateImportSuccess)
                                 viewModel.fetchTemplates(false)
                             },
                             showToast
@@ -148,7 +148,7 @@ fun AppProfileTemplateScreen(
                     scope.launch {
                         viewModel.exportTemplates(
                             {
-                                showToast(context.getString(R.string.app_profile_template_export_empty))
+                                showToast(appProfileTemplateExportEmpty)
                             }
                         ) { text ->
                             clipboardManager?.setPrimaryClip(ClipData.newPlainText("", text))
@@ -156,17 +156,18 @@ fun AppProfileTemplateScreen(
                     }
                 },
                 scrollBehavior = scrollBehavior,
-                hazeState = hazeState
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
+                modifier = Modifier.padding(WindowInsets.navigationBars.asPaddingValues()),
                 onClick = {
-                    navigator.navigate(
-                        TemplateEditorScreenDestination(
+                    navigator.navigateForResult(
+                        Route.TemplateEditor(
                             TemplateViewModel.TemplateInfo(),
                             false
-                        )
+                        ),
+                        "template_edit"
                     )
                 },
                 icon = { Icon(Icons.Filled.Add, null) },
@@ -176,13 +177,15 @@ fun AppProfileTemplateScreen(
         },
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+        contentWindowInsets = WindowInsets.safeDrawing,
     ) { innerPadding ->
         PullToRefreshBox(
             state = pullRefreshState,
-            modifier = (if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier).nestedScroll(
-                scrollBehavior.nestedScrollConnection
-            ),
+            modifier = Modifier
+                .nestedScroll(
+                    scrollBehavior.nestedScrollConnection
+                )
+                .blurSource(),
             isRefreshing = viewModel.isRefreshing,
             onRefresh = {
                 scope.launch { viewModel.fetchTemplates() }
@@ -209,10 +212,10 @@ fun AppProfileTemplateScreen(
                     Spacer(modifier = Modifier.height(innerPadding.calculateTopPadding()))
                 }
 
-                splicedLazyColumnGroup(
+                lazySegmentColumn(
                     items = viewModel.templateList,
                     key = { _, app -> app.id }) { _, app ->
-                    TemplateItem(navigator, app)
+                    TemplateItem(app)
                 }
 
                 item {
@@ -226,21 +229,21 @@ fun AppProfileTemplateScreen(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TemplateItem(
-    navigator: DestinationsNavigator,
     template: TemplateViewModel.TemplateInfo
 ) {
+    val navigator = LocalNavigator.current
     SettingsJumpPageWidget(
         title = template.name,
         iconPlaceholder = false,
         onClick = {
-            navigator.navigate(TemplateEditorScreenDestination(template, !template.local))
-        },
-        descriptionColumnContent = {
-            Text(
-                text = "${template.id}${if (template.author.isEmpty()) "" else "@${template.author}"}",
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = MaterialTheme.typography.bodySmall.fontSize,
+            navigator.navigateForResult(
+                Route.TemplateEditor(template, !template.local),
+                "template_edit"
             )
+        },
+        description = "${template.id}${if (template.author.isEmpty()) "" else "@${template.author}"}",
+        descriptionStyle = MaterialTheme.typography.bodySmallEmphasized,
+        descriptionColumnContent = {
             Text(template.description)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -253,29 +256,35 @@ private fun TemplateItem(
                 LabelText(
                     label = "GID: ${template.gid}",
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 LabelText(
                     label = template.context,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                 )
                 if (template.local) {
                     LabelText(
                         label = stringResource(R.string.local),
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 } else {
                     LabelText(
                         label = stringResource(R.string.remote),
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
         }
     )
+}
+
+@Preview
+@Composable
+fun TemplateItemPreview() {
+    CompositionLocalProvider(
+        LocalNavigator provides Navigator(Route.AppProfileTemplate)
+    ) {
+        TemplateItem(TemplateViewModel.TemplateInfo())
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -285,41 +294,25 @@ private fun TopBar(
     onSync: () -> Unit = {},
     onImport: () -> Unit = {},
     onExport: () -> Unit = {},
-    scrollBehavior: TopAppBarScrollBehavior? = null,
-    hazeState: HazeState?
+    scrollBehavior: TopAppBarScrollBehavior,
 ) {
-    MaterialTheme.colorScheme
-
-    val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
-        backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-            alpha = 0.8f
-        ),
-        tint = HazeTint(Color.Transparent)
-    ) else null
-
-    val collapsedFraction = scrollBehavior?.state?.collapsedFraction ?: 0f
-    val modifier =
-        if (ThemeConfig.backgroundImageLoaded && hazeStyle != null && hazeState != null) {
-            Modifier.hazeEffect(hazeState) {
-                style = hazeStyle
-                noiseFactor = 0f
-                blurRadius = 30.dp
-                alpha = collapsedFraction
-            }
-        } else Modifier
-
     LargeFlexibleTopAppBar(
-        modifier = modifier,
+        modifier = Modifier.blurEffect(
+        ),
         title = {
             Text(stringResource(R.string.settings_profile_template))
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
             scrolledContainerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
         ),
         navigationIcon = {
             AppBackButton(
@@ -370,7 +363,7 @@ private fun TopBar(
 fun LabelText(
     label: String,
     containerColor: Color = MaterialTheme.colorScheme.primary,
-    contentColor: Color = MaterialTheme.colorScheme.onPrimary
+    contentColor: Color = contentColorFor(containerColor)
 ) {
     Surface(
         shape = RoundedCornerShape(4.dp),
@@ -378,9 +371,7 @@ fun LabelText(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp
-            ),
+            style = MaterialTheme.typography.labelSmallEmphasized,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             color = contentColor,
             maxLines = 1,

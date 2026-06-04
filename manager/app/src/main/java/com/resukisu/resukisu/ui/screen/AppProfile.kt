@@ -27,8 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -36,13 +34,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,35 +49,32 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.destinations.AppProfileTemplateScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.TemplateEditorScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
+import com.resukisu.resukisu.ui.component.SwipeableSnackbarHost
 import com.resukisu.resukisu.ui.component.profile.AppProfileConfig
 import com.resukisu.resukisu.ui.component.profile.RootProfileConfig
 import com.resukisu.resukisu.ui.component.profile.TemplateConfig
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
+import com.resukisu.resukisu.ui.component.settings.SegmentedColumn
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
+import com.resukisu.resukisu.ui.component.settings.SettingsDropDownPopupMenuWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsSwitchWidget
-import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.theme.CardConfig
-import com.resukisu.resukisu.ui.theme.ThemeConfig
+import com.resukisu.resukisu.ui.theme.blurEffect
+import com.resukisu.resukisu.ui.theme.blurSource
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.forceStopApp
 import com.resukisu.resukisu.ui.util.getSepolicy
@@ -88,12 +83,6 @@ import com.resukisu.resukisu.ui.util.restartApp
 import com.resukisu.resukisu.ui.util.setSepolicy
 import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
 import com.resukisu.resukisu.ui.viewmodel.getTemplateInfoById
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 
 /**
@@ -101,12 +90,11 @@ import kotlinx.coroutines.launch
  * @date 2023/5/16.
  */
 @OptIn(ExperimentalMaterial3Api::class)
-@Destination<RootGraph>
 @Composable
 fun AppProfileScreen(
-    navigator: DestinationsNavigator,
     appGroup: SuperUserViewModel.AppGroup,
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val snackBarHost = LocalSnackbarHost.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -134,8 +122,10 @@ fun AppProfileScreen(
         colorScheme.surfaceContainer
     }
 
-    val hazeState = if (CardConfig.isCustomBackgroundEnabled) rememberHazeState() else null
-
+    LaunchedEffect(Unit) {
+        scrollBehavior.state.heightOffset = scrollBehavior.state.heightOffsetLimit
+    }
+    
     Scaffold(
         topBar = {
             TopBar(
@@ -145,20 +135,20 @@ fun AppProfileScreen(
                     containerColor = cardColor,
                     scrolledContainerColor = cardColor
                 ),
-                onBack = dropUnlessResumed { navigator.popBackStack() },
+                onBack = dropUnlessResumed { navigator.pop() },
                 scrollBehavior = scrollBehavior,
-                hazeState = hazeState
             )
         },
-        snackbarHost = { SnackbarHost(hostState = snackBarHost) },
+        snackbarHost = { SwipeableSnackbarHost(hostState = snackBarHost) },
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
     ) { paddingValues ->
         AppProfileInner(
-            modifier = (if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier)
+            modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                .blurSource(),
             topPadding = paddingValues.calculateTopPadding(),
             appGroup = appGroup,
             appIcon = {
@@ -175,11 +165,11 @@ fun AppProfileScreen(
             profile = profile,
             onViewTemplate = {
                 getTemplateInfoById(it)?.let { info ->
-                    navigator.navigate(TemplateEditorScreenDestination(info))
+                    navigator.push(Route.TemplateEditor(info, true))
                 }
             },
             onManageTemplate = {
-                navigator.navigate(AppProfileTemplateScreenDestination())
+                navigator.push(Route.AppProfileTemplate)
             },
             onProfileChange = {
                 scope.launch {
@@ -225,66 +215,26 @@ private fun AppProfileInner(
         }
 
         item {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
-                    alpha = CardConfig.cardAlpha
-                ),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-                var expanded by remember { mutableStateOf(false) }
-                var touchPoint: Offset by remember { mutableStateOf(Offset.Zero) }
-                val density = LocalDensity.current
-
-                SettingsBaseWidget(
-                    title = appGroup.mainApp.label,
-                    description = appGroup.mainApp.packageName,
-                    iconPlaceholder = false,
-                    rowHeader = {
-                        appIcon()
-                    },
-                    onClick = {
-                        touchPoint = it
-                        expanded = true
-                    }
-                ) {}
-
-                val (offsetX, offsetY) = with(density) {
-                    (touchPoint.x.toDp()) to (-touchPoint.y.toDp())
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    offset = DpOffset(offsetX, offsetY),
-                    onDismissRequest = {
-                        expanded = false
-                    }
-                ) {
-                    AppMenuOption(
-                        text = stringResource(id = R.string.launch_app),
-                        onClick = {
-                            expanded = false
-                            launchApp(appGroup.mainApp.packageName)
-                        }
-                    )
-
-                    AppMenuOption(
-                        text = stringResource(id = R.string.force_stop_app),
-                        onClick = {
-                            expanded = false
-                            forceStopApp(appGroup.mainApp.packageName)
-                        }
-                    )
-
-                    AppMenuOption(
-                        text = stringResource(id = R.string.restart_app),
-                        onClick = {
-                            expanded = false
-                            restartApp(appGroup.mainApp.packageName)
-                        }
-                    )
+            SettingsDropDownPopupMenuWidget(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                title = appGroup.mainApp.label,
+                description = appGroup.mainApp.packageName,
+                iconPlaceholder = false,
+                leadingContent = {
+                    appIcon()
+                },
+                choice = -1,
+                data = listOf(
+                    stringResource(id = R.string.launch_app),
+                    stringResource(id = R.string.force_stop_app),
+                    stringResource(id = R.string.restart_app)
+                )
+            ) { choice ->
+                when (choice) {
+                    0 -> launchApp(appGroup.mainApp.packageName)
+                    1 -> forceStopApp(appGroup.mainApp.packageName)
+                    2 -> restartApp(appGroup.mainApp.packageName)
+                    else -> throw IllegalStateException("Illegal choice: $choice")
                 }
             }
         }
@@ -446,7 +396,7 @@ private fun AppProfileInner(
 
         if (appGroup.apps.size > 1) {
             item {
-                SplicedColumnGroup(
+                SegmentedColumn(
                     title = stringResource(R.string.affected_applications)
                 ) {
                     appGroup.apps.forEach { app ->
@@ -459,8 +409,7 @@ private fun AppProfileInner(
                                 description = app.packageName,
                                 enabled = false,
                                 iconPlaceholder = false,
-                                noVerticalPadding = true,
-                                rowHeader = {
+                                leadingContent = {
                                     AsyncImage(
                                         model = ImageRequest.Builder(context).data(app.packageInfo)
                                             .crossfade(true).build(),
@@ -499,28 +448,10 @@ private fun TopBar(
     onBack: () -> Unit,
     colors: TopAppBarColors,
     scrollBehavior: TopAppBarScrollBehavior? = null,
-    hazeState: HazeState? = null
 ) {
-    val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
-        backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-            alpha = 0.8f
-        ),
-        tint = HazeTint(Color.Transparent)
-    ) else null
-
-    val collapsedFraction = scrollBehavior?.state?.collapsedFraction ?: 0f
-    val modifier = if (ThemeConfig.backgroundImageLoaded && hazeStyle != null && hazeState != null) {
-        Modifier.hazeEffect(hazeState) {
-            style = hazeStyle
-            noiseFactor = 0f
-            blurRadius = 30.dp
-            alpha = collapsedFraction
-        }
-    }
-    else Modifier
-
     LargeFlexibleTopAppBar(
-        modifier = modifier,
+        modifier = Modifier.blurEffect(
+        ),
         title = {
             Text(
                 text = title,
@@ -600,19 +531,6 @@ private fun ProfileBox(
             )
         }
     }
-}
-
-@Composable
-private fun AppMenuOption(text: String, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
-        onClick = onClick
-    )
 }
 
 @Preview

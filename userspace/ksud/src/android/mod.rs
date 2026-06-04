@@ -6,12 +6,17 @@ mod init_event;
 #[cfg(all(target_arch = "aarch64", target_os = "android"))]
 mod kpm;
 mod ksucalls;
+mod late_load;
 mod module;
 mod profile;
+mod resetprop;
 mod restorecon;
 mod sepolicy;
 mod su;
-#[cfg(all(target_arch = "aarch64", target_os = "android"))]
+mod sulog;
 mod susfs;
+#[allow(nonstandard_style, unused, unsafe_op_in_unsafe_fn)]
+mod uapi;
 mod umount_config;
+mod unload;
 pub mod utils;

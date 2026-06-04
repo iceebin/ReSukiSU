@@ -2,28 +2,27 @@ package com.resukisu.resukisu.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.ManagedActivityResultLauncher
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -40,42 +39,75 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.compose.rememberNavController
-import com.ramcosta.composedestinations.DestinationsNavHost
-import com.ramcosta.composedestinations.animations.NavHostAnimatedDestinationStyle
-import com.ramcosta.composedestinations.annotation.Destination
-import com.ramcosta.composedestinations.annotation.RootGraph
-import com.ramcosta.composedestinations.generated.NavGraphs
-import com.ramcosta.composedestinations.generated.destinations.ExecuteModuleActionScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.InstallScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
-import com.ramcosta.composedestinations.spec.NavHostGraphSpec
-import com.ramcosta.composedestinations.utils.rememberDestinationsNavigator
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.SceneInfo
+import androidx.navigation3.scene.SinglePaneSceneStrategy
+import androidx.navigation3.scene.rememberSceneState
+import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.NavigationEventState
+import androidx.navigationevent.compose.rememberNavigationEventState
 import com.resukisu.resukisu.Natives
+import com.resukisu.resukisu.ui.activity.PermissionRequestInterface
 import com.resukisu.resukisu.ui.activity.component.NavigationBar
 import com.resukisu.resukisu.ui.activity.util.ThemeChangeContentObserver
 import com.resukisu.resukisu.ui.activity.util.ThemeUtils
+import com.resukisu.resukisu.ui.animation.predictiveback.AOSPCrossActivityAnimation
+import com.resukisu.resukisu.ui.animation.predictiveback.KernelSUClassicPredictiveBackAnimation
+import com.resukisu.resukisu.ui.animation.predictiveback.MiuixPredictiveBackAnimation
+import com.resukisu.resukisu.ui.animation.predictiveback.NoPredictiveBackAnimation
+import com.resukisu.resukisu.ui.animation.predictiveback.ScalePredictiveBackAnimation
 import com.resukisu.resukisu.ui.component.InstallConfirmationDialog
 import com.resukisu.resukisu.ui.component.ZipFileDetector
 import com.resukisu.resukisu.ui.component.ZipFileInfo
 import com.resukisu.resukisu.ui.component.ZipType
+import com.resukisu.resukisu.ui.navigation.HandleDeepLink
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
+import com.resukisu.resukisu.ui.navigation.rememberNavigator
+import com.resukisu.resukisu.ui.screen.AppProfileScreen
+import com.resukisu.resukisu.ui.screen.AppProfileTemplateScreen
 import com.resukisu.resukisu.ui.screen.BottomBarDestination
+import com.resukisu.resukisu.ui.screen.ExecuteModuleActionScreen
 import com.resukisu.resukisu.ui.screen.FlashIt
+import com.resukisu.resukisu.ui.screen.FlashScreen
+import com.resukisu.resukisu.ui.screen.InstallScreen
+import com.resukisu.resukisu.ui.screen.SulogScreen
+import com.resukisu.resukisu.ui.screen.TemplateEditorScreen
+import com.resukisu.resukisu.ui.screen.UmountManagerScreen
+import com.resukisu.resukisu.ui.screen.about.AboutScreen
+import com.resukisu.resukisu.ui.screen.about.OpenSourceLicenseScreen
+import com.resukisu.resukisu.ui.screen.moduleRepo.ModuleRepoScreen
+import com.resukisu.resukisu.ui.screen.moduleRepo.OnlineModuleDetailScreen
+import com.resukisu.resukisu.ui.susfs.SuSFSConfigScreen
 import com.resukisu.resukisu.ui.theme.KernelSUTheme
 import com.resukisu.resukisu.ui.theme.ThemeConfig
+import com.resukisu.resukisu.ui.theme.backgroundImagePainter
+import com.resukisu.resukisu.ui.theme.blurSource
+import com.resukisu.resukisu.ui.util.LocalBlurState
 import com.resukisu.resukisu.ui.util.LocalHandlePageChange
 import com.resukisu.resukisu.ui.util.LocalPagerState
+import com.resukisu.resukisu.ui.util.LocalPermissionRequestInterface
 import com.resukisu.resukisu.ui.util.LocalSelectedPage
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.install
@@ -83,14 +115,21 @@ import com.resukisu.resukisu.ui.util.rootAvailable
 import com.resukisu.resukisu.ui.viewmodel.HomeViewModel
 import com.resukisu.resukisu.ui.viewmodel.SuperUserViewModel
 import com.resukisu.resukisu.ui.webui.WebUIActivity
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.isRenderEffectSupported
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import zako.zako.zako.zakoui.screen.kernelFlash.KernelFlashScreen
+import zako.zako.zako.zakoui.screen.moreSettings.MoreSettingsScreen
 import zako.zako.zako.zakoui.screen.moreSettings.util.LocaleHelper
+import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
     private lateinit var superUserViewModel: SuperUserViewModel
@@ -100,8 +139,39 @@ class MainActivity : ComponentActivity() {
     data class SettingsState(
         val isHideOtherInfo: Boolean = false,
         val showKpmInfo: Boolean = false,
-        val dpi: Int = 0
+        val dpi: Int = 0,
+        val predictiveBackAnimation: PredictiveBackAnimation = PredictiveBackAnimation.Scale,
+        val predictiveBackExitDirection: PredictiveBackExitDirection = PredictiveBackExitDirection.FOLLOW_GESTURE
     )
+
+    enum class PredictiveBackAnimation(val value: String) {
+        None("none"),
+        AOSP("aosp"),
+        MIUIX("miuix"),
+        Scale("scale"),
+        KernelSUClassic("ksu_classic");
+
+        companion object {
+            fun fromValueOrDefault(value: String) =
+                PredictiveBackAnimation.entries.find { it.value == value } ?: Scale
+        }
+    }
+
+    enum class PredictiveBackExitDirection(val value: String) {
+        /** Follows the user's swipe gesture direction (e.g., swipe left -> exit right). */
+        FOLLOW_GESTURE("follow_gesture"),
+
+        /** Always translates to the right, regardless of swipe edge. */
+        ALWAYS_RIGHT("always_right"),
+
+        /** Always translates to the left, regardless of swipe edge. */
+        ALWAYS_LEFT("always_left");
+
+        companion object {
+            fun fromValueOrDefault(value: String) =
+                PredictiveBackExitDirection.entries.find { it.value == value } ?: FOLLOW_GESTURE
+        }
+    }
 
     private var showConfirmationDialog = mutableStateOf(false)
     private var pendingZipFiles = mutableStateOf<List<ZipFileInfo>>(emptyList())
@@ -175,54 +245,6 @@ class MainActivity : ComponentActivity() {
             setContent {
                 KernelSUTheme {
                     val context = LocalContext.current
-                    val navController = rememberNavController()
-                    val snackBarHostState = remember { SnackbarHostState() }
-
-                    val navigator = navController.rememberDestinationsNavigator()
-
-                    InstallConfirmationDialog(
-                        show = showConfirmationDialog.value,
-                        zipFiles = pendingZipFiles.value,
-                        onConfirm = { confirmedFiles ->
-                            showConfirmationDialog.value = false
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                val moduleUris = confirmedFiles.filter { it.type == ZipType.MODULE }
-                                    .map { it.uri }
-                                val kernelUris = confirmedFiles.filter { it.type == ZipType.KERNEL }
-                                    .map { it.uri }
-
-                                when {
-                                    kernelUris.isNotEmpty() && moduleUris.isEmpty() -> {
-                                        if (kernelUris.size == 1 && rootAvailable()) {
-                                            withContext(Dispatchers.Main) {
-                                                navigator.navigate(
-                                                    InstallScreenDestination(
-                                                        preselectedKernelUri = kernelUris.first()
-                                                            .toString()
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    moduleUris.isNotEmpty() -> {
-                                        withContext(Dispatchers.Main) {
-                                            navigator.navigate(
-                                                FlashScreenDestination(
-                                                    FlashIt.FlashModules(ArrayList(moduleUris))
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        onDismiss = {
-                            showConfirmationDialog.value = false
-                            pendingZipFiles.value = emptyList()
-                            finish()
-                        }
-                    )
 
                     LaunchedEffect(zipUri) {
                         if (zipUri.isNullOrEmpty()) return@LaunchedEffect
@@ -243,10 +265,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    ShortcutIntentHandler(
-                        intentState = intentState,
-                        navigator = navigator
-                    )
                     val settings by settingsStateFlow.collectAsState()
                     val systemDensity = LocalDensity.current
 
@@ -254,36 +272,368 @@ class MainActivity : ComponentActivity() {
                         if (settings.dpi <= 0f) {
                             systemDensity
                         } else {
-                            // 直接计算自定义 DPI 占 160 (标准 MDPI) 的比例
-                            // 公式：Density = TargetDPI / 160
                             val targetDensity = settings.dpi / 160f
                             Density(density = targetDensity, fontScale = systemDensity.fontScale)
                         }
                     }
 
+                    val navigator = rememberNavigator(Route.Main)
+
+                    lateinit var permissionRequestHandler: ManagedActivityResultLauncher<Array<String>, Map<String, @JvmSuppressWildcards Boolean>>
+
+                    val permissionRequestInterface = object : PermissionRequestInterface {
+                        private val mutex = Mutex()
+                        private var currentCallback: ((Map<String, @JvmSuppressWildcards Boolean>) -> Unit)? =
+                            null
+
+                        override fun requestPermission(
+                            permission: String,
+                            callback: (Boolean) -> Unit,
+                            requestDescription: String
+                        ) {
+                            if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+                                callback(true)
+                                return
+                            }
+
+                            lifecycleScope.launch {
+                                mutex.withLock {
+                                    suspendCancellableCoroutine { continuation ->
+                                        currentCallback = { result ->
+                                            callback(result.any { it.value })
+                                            continuation.resume(Unit)
+                                        }
+
+                                        if (requestDescription.isNotBlank() && ActivityCompat.shouldShowRequestPermissionRationale(
+                                                this@MainActivity,
+                                                permission
+                                            )
+                                        )
+                                            Toast.makeText(
+                                                context,
+                                                requestDescription,
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                        permissionRequestHandler.launch(arrayOf(permission))
+                                    }
+                                }
+                            }
+                        }
+
+                        override fun requestPermissions(
+                            permissions: Array<String>,
+                            callback: (Map<String, @JvmSuppressWildcards Boolean>) -> Unit,
+                            requestDescription: Map<String, String>
+                        ) {
+                            val permissionsToRequest = permissions.filter {
+                                checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+                            }.toTypedArray()
+
+                            if (permissionsToRequest.isEmpty()) {
+                                callback(permissions.associateWith { true })
+                                return
+                            }
+
+                            lifecycleScope.launch {
+                                mutex.withLock {
+                                    suspendCancellableCoroutine { continuation ->
+                                        currentCallback = { result ->
+                                            val finalResult = permissions.associateWith { perm ->
+                                                result[perm] ?: true
+                                            }
+                                            callback(finalResult)
+                                            continuation.resume(Unit)
+                                        }
+
+                                        permissionsToRequest.forEach { perm ->
+                                            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                                                    this@MainActivity,
+                                                    perm
+                                                )
+                                            ) {
+                                                val msg = requestDescription[perm]
+                                                if (!msg.isNullOrBlank()) {
+                                                    Toast.makeText(
+                                                        this@MainActivity,
+                                                        msg,
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
+                                        }
+
+                                        permissionRequestHandler.launch(permissionsToRequest)
+                                    }
+                                }
+                            }
+                        }
+
+                        fun onPermissionRequestCallback(result: Map<String, @JvmSuppressWildcards Boolean>) =
+                            currentCallback?.invoke(result)
+                    }
+
+                    permissionRequestHandler = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.RequestMultiplePermissions(),
+                        onResult = permissionRequestInterface::onPermissionRequestCallback
+                    )
+
                     CompositionLocalProvider(
-                        LocalSnackbarHost provides snackBarHostState,
+                        LocalPermissionRequestInterface provides permissionRequestInterface,
+                        LocalNavigator provides navigator,
                         LocalDensity provides density
                     ) {
-                        DestinationsNavHost(
-                            navGraph = NavGraphs.root as NavHostGraphSpec,
-                            navController = navController,
-                            defaultTransitions = object :
-                                NavHostAnimatedDestinationStyle() {
-                                override val enterTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-                                    slideInHorizontally(initialOffsetX = { it })
-                                }
+                        HandleDeepLink(
+                            intentState = intentState.collectAsState()
+                        )
 
-                                override val exitTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-                                    slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut()
-                                }
+                        ShortcutIntentHandler(
+                            intentState = intentState
+                        )
 
-                                override val popEnterTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-                                    slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn()
-                                }
+                        InstallConfirmationDialog(
+                            show = showConfirmationDialog.value,
+                            zipFiles = pendingZipFiles.value,
+                            onConfirm = { confirmedFiles ->
+                                showConfirmationDialog.value = false
+                                lifecycleScope.launch(Dispatchers.IO) {
+                                    val moduleUris =
+                                        confirmedFiles.filter { it.type == ZipType.MODULE }
+                                            .map { it.uri }
+                                    val kernelUris =
+                                        confirmedFiles.filter { it.type == ZipType.KERNEL }
+                                            .map { it.uri }
 
-                                override val popExitTransition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-                                    scaleOut(targetScale = 0.9f) + fadeOut()
+                                    when {
+                                        kernelUris.isNotEmpty() && moduleUris.isEmpty() -> {
+                                            if (kernelUris.size == 1 && rootAvailable()) {
+                                                withContext(Dispatchers.Main) {
+                                                    navigator.push(
+                                                        Route.Install(
+                                                            preselectedKernelUri = kernelUris.first()
+                                                                .toString()
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        moduleUris.isNotEmpty() -> {
+                                            withContext(Dispatchers.Main) {
+                                                navigator.push(
+                                                    Route.Flash(
+                                                        FlashIt.FlashModules(ArrayList(moduleUris))
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onDismiss = {
+                                showConfirmationDialog.value = false
+                                pendingZipFiles.value = emptyList()
+                                finish()
+                            }
+                        )
+
+                        val predictiveBackAnimationHandler = remember(
+                            settings.predictiveBackAnimation,
+                            settings.predictiveBackExitDirection
+                        ) {
+                            when (settings.predictiveBackAnimation) {
+                                PredictiveBackAnimation.None -> NoPredictiveBackAnimation()
+                                PredictiveBackAnimation.AOSP -> AOSPCrossActivityAnimation(settings.predictiveBackExitDirection)
+                                PredictiveBackAnimation.Scale -> ScalePredictiveBackAnimation(
+                                    settings.predictiveBackExitDirection
+                                )
+
+                                PredictiveBackAnimation.KernelSUClassic -> KernelSUClassicPredictiveBackAnimation()
+                                PredictiveBackAnimation.MIUIX -> MiuixPredictiveBackAnimation()
+                            }
+                        }
+
+                        var gestureState: NavigationEventState<SceneInfo<NavKey>>? = null
+                        val navigationScope = rememberCoroutineScope()
+                        val onBack: (() -> Unit) -> Unit = { callBack ->
+                            navigationScope.launch {
+                                predictiveBackAnimationHandler.onBackPressed(
+                                    transitionState = gestureState?.transitionState,
+                                    currentPageKey = navigator.current()
+                                )
+
+                                callBack()
+
+                                when (val top = navigator.current()) {
+                                    is Route.TemplateEditor -> {
+                                        if (!top.readOnly) {
+                                            navigator.setResult("template_edit", true)
+                                        } else {
+                                            navigator.pop()
+                                        }
+                                    }
+
+                                    else -> navigator.pop()
+                                }
+                            }
+                        }
+
+                        val entries =
+                            rememberDecoratedNavEntries(
+                                backStack = navigator.backStack,
+                                entryDecorators = listOf(
+                                    rememberSaveableStateHolderNavEntryDecorator(),
+                                    rememberViewModelStoreNavEntryDecorator(),
+                                    NavEntryDecorator(
+                                        onPop = { key ->
+                                            predictiveBackAnimationHandler.onPagePop(
+                                                contentPageKey = key,
+                                                animationScope = navigationScope
+                                            )
+                                        }
+                                    ) { content ->
+                                        val snackBarHostState = remember { SnackbarHostState() }
+                                        with(predictiveBackAnimationHandler) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .predictiveBackAnimationDecorator(
+                                                        gestureState?.transitionState,
+                                                        content.contentKey,
+                                                        navigator.current()
+                                                    )
+                                                    .then(
+                                                        if (!ThemeConfig.backgroundImageLoaded) Modifier.background(
+                                                            MaterialTheme.colorScheme.surfaceContainer
+                                                        ) else Modifier
+                                                    )
+                                            ) {
+                                                val surfaceContainer =
+                                                    MaterialTheme.colorScheme.surfaceContainer
+
+                                                CompositionLocalProvider(
+                                                    LocalBlurState provides rememberMaterial3BlurBackdrop(
+                                                        ThemeConfig.isEnableBlur
+                                                    ),
+                                                    LocalSnackbarHost provides snackBarHostState,
+                                                ) {
+                                                    backgroundImagePainter?.let {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxSize()
+                                                                .zIndex(-1f)
+                                                                .paint(
+                                                                    painter = it,
+                                                                    contentScale = ContentScale.Crop,
+                                                                )
+                                                                .drawWithContent {
+                                                                    drawContent()
+                                                                    drawRect(
+                                                                        color = surfaceContainer.copy(
+                                                                            alpha = ThemeConfig.backgroundDim
+                                                                        )
+                                                                    )
+                                                                }
+                                                        )
+                                                    }
+                                                    content.Content()
+                                                }
+                                            }
+                                        }
+                                    }
+                                ),
+                                entryProvider = entryProvider {
+                                    entry<Route.About> { AboutScreen() }
+                                    entry<Route.OpenSourceLicense> { OpenSourceLicenseScreen() }
+                                    entry<Route.Sulog> { SulogScreen() }
+                                    entry<Route.Main> { MainScreen() }
+                                    entry<Route.AppProfileTemplate> { AppProfileTemplateScreen() }
+                                    entry<Route.TemplateEditor> { key ->
+                                        TemplateEditorScreen(
+                                            key.template,
+                                            key.readOnly
+                                        )
+                                    }
+                                    entry<Route.AppProfile> { key -> AppProfileScreen(key.appGroup) }
+                                    entry<Route.ModuleRepo> { ModuleRepoScreen() }
+                                    entry<Route.ModuleRepoDetail> { key ->
+                                        OnlineModuleDetailScreen(
+                                            key.module
+                                        )
+                                    }
+                                    entry<Route.Install> { key -> InstallScreen(key.preselectedKernelUri) }
+                                    entry<Route.Flash> { key -> FlashScreen(key.flashIt) }
+                                    entry<Route.ExecuteModuleAction> { key ->
+                                        ExecuteModuleActionScreen(
+                                            key.moduleId
+                                        )
+                                    }
+                                    entry<Route.Home> { MainScreen() }
+                                    entry<Route.SuperUser> { MainScreen() }
+                                    entry<Route.Module> { MainScreen() }
+                                    entry<Route.Settings> { MainScreen() }
+                                    entry<Route.MoreSettings> { MoreSettingsScreen() }
+                                    entry<Route.SuSFSConfig> { SuSFSConfigScreen() }
+                                    entry<Route.UmountManager> { UmountManagerScreen() }
+                                    entry<Route.KernelFlash> { key ->
+                                        KernelFlashScreen(
+                                            key.kernelUri,
+                                            key.selectedSlot,
+                                            key.kpmPatchEnabled,
+                                            key.kpmUndoPatch
+                                        )
+                                    }
+                                },
+                            )
+
+                        val sceneState =
+                            rememberSceneState(
+                                entries = entries,
+                                sceneStrategies = listOf(SinglePaneSceneStrategy()),
+                                sceneDecoratorStrategies = emptyList(),
+                                sharedTransitionScope = null,
+                                onBack = {
+                                    onBack {}
+                                },
+                            )
+                        val scene = sceneState.currentScene
+
+                        // Predictive Back Handling
+                        val currentInfo = SceneInfo(scene)
+                        val previousSceneInfos = sceneState.previousScenes.map { SceneInfo(it) }
+                        gestureState = rememberNavigationEventState(
+                            currentInfo = currentInfo,
+                            backInfo = previousSceneInfos
+                        )
+
+                        NavigationBackHandler(
+                            state = gestureState,
+                            isBackEnabled = scene.previousEntries.isNotEmpty(),
+                            onBackCompleted = { callBack ->
+                                onBack(callBack)
+                            },
+                            onBackCancelled = { callBack ->
+                                callBack()
+                            }
+                        )
+
+                        NavDisplay(
+                            sceneState = sceneState,
+                            navigationEventState = gestureState,
+                            contentAlignment = Alignment.TopStart,
+                            sizeTransform = null,
+                            predictivePopTransitionSpec = { swipeEdge ->
+                                with(predictiveBackAnimationHandler) {
+                                    onPredictivePopTransitionSpec(swipeEdge = swipeEdge)
+                                }
+                            },
+                            popTransitionSpec = {
+                                with(predictiveBackAnimationHandler) {
+                                    onPopTransitionSpec()
+                                }
+                            },
+                            transitionSpec = {
+                                with(predictiveBackAnimationHandler) {
+                                    onTransitionSpec()
                                 }
                             }
                         )
@@ -352,11 +702,40 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * @param navigator 页面导航
+ * Remember a LayerBackdrop for Material 3 with a surfaceContainer background
+ * to prevent alpha-blending artifacts.
+ *
+ * @param enableBlur Whether the blur effect is globally enabled.
+ * @return A LayerBackdrop instance if supported and enabled, null otherwise.
  */
-@Destination<RootGraph>(start = true)
 @Composable
-fun MainScreen(navigator: DestinationsNavigator) {
+fun rememberMaterial3BlurBackdrop(enableBlur: Boolean): LayerBackdrop? {
+    if (!enableBlur || !isRenderEffectSupported()) return null
+
+    val backgroundColor =
+        MaterialTheme.colorScheme.surfaceContainer
+
+    return rememberLayerBackdrop {
+        if (ThemeConfig.isEnableBlurExp) {
+            backgroundImagePainter?.let { painter ->
+                with(painter) {
+                    draw(size = drawContext.size)
+                }
+            }
+        } else {
+            drawRect(backgroundColor)
+        }
+
+        drawRect(
+            color = backgroundColor.copy(alpha = ThemeConfig.backgroundDim)
+        )
+
+        drawContent()
+    }
+}
+
+@Composable
+fun MainScreen() {
     // 页面隐藏处理
     val activity = LocalActivity.current as MainActivity
     val settings by activity.settingsStateFlow.collectAsState()
@@ -382,7 +761,6 @@ fun MainScreen(navigator: DestinationsNavigator) {
     var animating by remember { mutableStateOf(false) }
     var animateJob by remember { mutableStateOf<Job?>(null) }
     var lastRequestedPage by remember { mutableIntStateOf(pagerState.currentPage) }
-    val hazeState = if (ThemeConfig.backgroundImageLoaded) rememberHazeState() else null
 
     val handlePageChange: (Int) -> Unit = remember(pagerState, coroutineScope) {
         { page ->
@@ -443,71 +821,58 @@ fun MainScreen(navigator: DestinationsNavigator) {
             modifier = Modifier.fillMaxSize()
         ) {
             val isPortrait = maxWidth < maxHeight || (maxHeight / maxWidth > 1.4f)
-            MainScreenContent(
-                isPortrait = isPortrait,
-                pages = pages,
-                hazeState = hazeState,
-                navigator = navigator,
-                userScrollEnabled = userScrollEnabled,
-                pagerState = pagerState,
-            )
-        }
-    }
-}
+            val content = @Composable { paddingBottom: Dp ->
+                HorizontalPager(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blurSource(),
+                    state = pagerState,
+                    userScrollEnabled = userScrollEnabled,
+                ) { pageIndex ->
+                    if (pages.isEmpty()) return@HorizontalPager
 
-@Composable
-private fun MainScreenContent(
-    isPortrait: Boolean,
-    pages: List<BottomBarDestination>,
-    hazeState: HazeState?,
-    navigator: DestinationsNavigator,
-    userScrollEnabled: Boolean,
-    pagerState: PagerState
-) {
-    val content = @Composable { paddingBottom: Dp ->
-        HorizontalPager(
-            modifier = Modifier.fillMaxSize(),
-            state = pagerState,
-            beyondViewportPageCount = 2,
-            userScrollEnabled = userScrollEnabled,
-        ) { pageIndex ->
-            if (pages.isEmpty()) return@HorizontalPager
-            val destination = pages[pageIndex]
-            destination.direction(navigator, paddingBottom, hazeState)
-        }
-    }
+                    val snackBarHostState = remember { SnackbarHostState() }
+                    CompositionLocalProvider(
+                        LocalSnackbarHost provides snackBarHostState,
+                        LocalBlurState provides rememberMaterial3BlurBackdrop(ThemeConfig.isEnableBlur),
+                    ) {
+                        val destination = pages[pageIndex]
+                        destination.direction(paddingBottom)
+                    }
+                }
+            }
 
-    if (isPortrait) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            bottomBar = {
-                NavigationBar(
-                    destinations = pages,
-                    hazeState = hazeState,
-                    isBottomBar = true,
-                )
-            },
-            containerColor = Color.Transparent,
-        ) { innerPadding ->
-            content(innerPadding.calculateBottomPadding())
-        }
-    } else {
-        Row(modifier = Modifier.fillMaxSize()) {
-            NavigationBar(
-                destinations = pages,
-                hazeState = hazeState,
-                isBottomBar = false,
-            )
-            content(0.dp)
+            if (isPortrait) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        NavigationBar(
+                            destinations = pages,
+                            isBottomBar = true,
+                        )
+                    },
+                    containerColor = Color.Transparent,
+                ) { innerPadding ->
+                    content(innerPadding.calculateBottomPadding())
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    NavigationBar(
+                        destinations = pages,
+                        isBottomBar = false,
+                    )
+                    content(0.dp)
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun ShortcutIntentHandler(
-    intentState: MutableStateFlow<Int>,
-    navigator: DestinationsNavigator
+    intentState: MutableStateFlow<Int>
 ) {
+    val navigator = LocalNavigator.current
     val activity = LocalActivity.current ?: return
     val context = LocalContext.current
     val intentStateValue by intentState.collectAsState()
@@ -517,9 +882,7 @@ private fun ShortcutIntentHandler(
         when (type) {
             "module_action" -> {
                 val moduleId = intent.getStringExtra("module_id") ?: return@LaunchedEffect
-                navigator.navigate(ExecuteModuleActionScreenDestination(moduleId)) {
-                    launchSingleTop = true
-                }
+                navigator.push(Route.ExecuteModuleAction(moduleId))
             }
 
             "module_webui" -> {

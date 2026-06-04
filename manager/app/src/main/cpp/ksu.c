@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <errno.h>
 
 #include "prelude.h"
 #include "ksu.h"
@@ -109,19 +110,35 @@ bool is_safe_mode() {
 bool is_lkm_mode() {
     auto info = get_info();
     if (info.version > 0) {
-        return (info.flags & 0x1) != 0;
+        return (info.flags & KSU_GET_INFO_FLAG_LKM) != 0;
     }
     // Legacy Compatible
-    return (legacy_get_info().flags & 0x1) != 0;
+    return (legacy_get_info().flags & KSU_GET_INFO_FLAG_LKM) != 0;
 }
 
 bool is_manager() {
     auto info = get_info();
     if (info.version > 0) {
-        return (info.flags & 0x2) != 0;
+        return (info.flags & KSU_GET_INFO_FLAG_MANAGER) != 0;
     }
     // Legacy Compatible
     return legacy_get_info().version > 0;
+}
+
+bool is_late_load_mode() {
+    auto info = get_info();
+    if (info.version > 0) {
+        return (info.flags & KSU_GET_INFO_FLAG_LATE_LOAD) != 0;
+    }
+    return false;
+}
+
+bool is_pr_build() {
+    auto info = get_info();
+    if (info.version > 0) {
+        return (info.flags & KSU_GET_INFO_FLAG_PR_BUILD) != 0;
+    }
+    return false;
 }
 
 bool uid_should_umount(int uid) {
@@ -205,8 +222,23 @@ bool is_kernel_umount_enabled() {
     return value != 0;
 }
 
-bool set_sulog_enabled(bool enabled) {
-    return set_feature(KSU_FEATURE_SULOG, enabled ? 1 : 0);
+int set_selinux_hide_enabled(bool enabled) {
+    if (!set_feature(KSU_FEATURE_SELINUX_HIDE, enabled ? 1 : 0)) {
+        return -errno;
+    }
+    return 0;
+}
+
+bool is_selinux_hide_enabled() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_SELINUX_HIDE, &value, &supported)) {
+        return false;
+    }
+    if (!supported) {
+        return false;
+    }
+    return value != 0;
 }
 
 bool is_sulog_enabled() {
@@ -219,6 +251,10 @@ bool is_sulog_enabled() {
         return false;
     }
     return value != 0;
+}
+
+bool set_sulog_enabled(bool enabled) {
+    return set_feature(KSU_FEATURE_SULOG, enabled ? 1 : 0);
 }
 
 void get_full_version(char* buff) {
@@ -249,35 +285,42 @@ void get_hook_type(char *buff) {
     }
 }
 
+int get_kernel_patch_implement() {
+    struct ksu_get_kernel_patch_implement cmd = {0};
+    if (ksuctl(KSU_IOCTL_GET_KERNEL_PATCH_IMPLEMENT, &cmd) != 0)
+        return 0;
+    return cmd.type;
+}
+
 bool set_dynamic_manager(unsigned int size, const char *hash)
 {
 	struct ksu_dynamic_manager_cmd cmd = {0};
-	cmd.config.operation = DYNAMIC_MANAGER_OP_SET;
-	cmd.config.size	  = size;
-	strlcpy(cmd.config.hash, hash, sizeof(cmd.config.hash));
+	cmd.operation = DYNAMIC_MANAGER_OP_SET;
+	cmd.size	  = size;
+	strlcpy((char *) cmd.hash, hash, sizeof(cmd.hash));
 
 	return ksuctl(KSU_IOCTL_DYNAMIC_MANAGER, &cmd) == 0;
 }
 
-bool get_dynamic_manager(struct dynamic_manager_user_config *cfg)
+bool get_dynamic_manager(struct ksu_dynamic_manager_cmd *cfg)
 {
 	if (!cfg) 
 		return false;
 
 	struct ksu_dynamic_manager_cmd cmd = {0};
-	cmd.config.operation = DYNAMIC_MANAGER_OP_GET;
+	cmd.operation = DYNAMIC_MANAGER_OP_GET;
 
 	if (ksuctl(KSU_IOCTL_DYNAMIC_MANAGER, &cmd) != 0)
 		return false;
 
-	*cfg = cmd.config;
+	*cfg = cmd;
 	return true;
 }
 
 bool clear_dynamic_manager(void)
 {
 	struct ksu_dynamic_manager_cmd cmd = {0};
-	cmd.config.operation = DYNAMIC_MANAGER_OP_CLEAR;
+	cmd.operation = DYNAMIC_MANAGER_OP_WIPE;
 	return ksuctl(KSU_IOCTL_DYNAMIC_MANAGER, &cmd) == 0;
 }
 

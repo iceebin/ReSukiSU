@@ -1,8 +1,14 @@
 package com.resukisu.resukisu.ui.screen.main
 
+import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.system.OsConstants
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,20 +33,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.automirrored.rounded.Article
+import androidx.compose.material.icons.filled.Adb
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Fence
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.RemoveRedEye
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.rounded.ElectricalServices
 import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.RemoveModerator
@@ -53,13 +61,13 @@ import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,38 +90,36 @@ import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import com.maxkeppeker.sheets.core.models.base.IconSource
 import com.maxkeppeler.sheets.list.models.ListOption
-import com.ramcosta.composedestinations.generated.destinations.AppProfileTemplateScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.FlashScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.LogViewerScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.MoreSettingsScreenDestination
-import com.ramcosta.composedestinations.generated.destinations.UmountManagerScreenDestination
-import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.resukisu.resukisu.BuildConfig
 import com.resukisu.resukisu.Natives
 import com.resukisu.resukisu.R
-import com.resukisu.resukisu.ui.component.AboutDialog
+import com.resukisu.resukisu.ksuApp
+import com.resukisu.resukisu.magica.BootCompletedReceiver
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.DialogHandle
+import com.resukisu.resukisu.ui.component.SwipeableSnackbarHost
 import com.resukisu.resukisu.ui.component.ksuIsValid
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
 import com.resukisu.resukisu.ui.component.rememberLoadingDialog
+import com.resukisu.resukisu.ui.component.settings.SegmentedColumn
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsDropdownWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsJumpPageWidget
 import com.resukisu.resukisu.ui.component.settings.SettingsSwitchWidget
-import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
+import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.FlashIt
+import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeConfig
+import com.resukisu.resukisu.ui.theme.blurEffect
+import com.resukisu.resukisu.ui.theme.blurSource
 import com.resukisu.resukisu.ui.util.LocalSnackbarHost
 import com.resukisu.resukisu.ui.util.execKsud
 import com.resukisu.resukisu.ui.util.getBugreportFile
+import com.resukisu.resukisu.ui.util.getFeaturePersistValue
 import com.resukisu.resukisu.ui.util.getFeatureStatus
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
+import com.topjohnwu.superuser.ShellUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -129,19 +135,19 @@ private val SPACING_LARGE = 16.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState: HazeState?) {
+fun SettingsPage(bottomPadding: Dp) {
+    val navigator = LocalNavigator.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
     val snackBarHost = LocalSnackbarHost.current
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    var isSuLogEnabled by remember { mutableStateOf(Natives.isSuLogEnabled()) }
 
     Scaffold(
         topBar = {
-            TopBar(scrollBehavior = scrollBehavior, hazeState = hazeState)
+            TopBar(scrollBehavior = scrollBehavior)
         },
         snackbarHost = {
-            SnackbarHost(
+            SwipeableSnackbarHost(
                 modifier = Modifier.padding(bottom = bottomPadding),
                 hostState = snackBarHost
             )
@@ -150,9 +156,6 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
         contentColor = MaterialTheme.colorScheme.onSurface,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
     ) { innerPadding ->
-        val aboutDialog = rememberCustomDialog {
-            AboutDialog(it)
-        }
         val loadingDialog = rememberLoadingDialog()
         var showBottomsheet by remember { mutableStateOf(false) }
         val logSaved = stringResource(R.string.log_saved)
@@ -182,10 +185,9 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
         LazyColumn(
             modifier =
-                (if (hazeState != null)
-                    Modifier.hazeSource(state = hazeState)
-                else Modifier)
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                Modifier
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .blurSource(),
             contentPadding = PaddingValues(
                 top = innerPadding.calculateTopPadding() + 5.dp,
                 start = 0.dp,
@@ -202,7 +204,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                         stringResource(id = R.string.settings_mode_disable_always),
                     )
 
-                    SplicedColumnGroup(
+                    SegmentedColumn(
                         title = stringResource(R.string.configuration),
                         content = {
                             item {
@@ -212,34 +214,29 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                     title = stringResource(R.string.settings_profile_template),
                                     description = stringResource(R.string.settings_profile_template_summary),
                                     onClick = {
-                                        navigator.navigate(AppProfileTemplateScreenDestination)
+                                        navigator.push(Route.AppProfileTemplate)
                                     }
                                 )
                             }
 
                             item {
-                                var suCompatMode by rememberSaveable {
-                                    mutableIntStateOf(
-                                        run {
-                                            val currentEnabled = Natives.isSuEnabled()
-                                            val savedPersist = prefs.getInt("su_compat_mode", 0)
-                                            if (savedPersist == 2) 2 else if (!currentEnabled) 1 else 0
-                                        }
-                                    )
+                                val currentSuEnabled = Natives.isSuEnabled()
+                                var suCompatMode by rememberSaveable { mutableIntStateOf(if (!currentSuEnabled) 1 else 0) }
+                                val suPersistValue by produceState(initialValue = null as Long?) {
+                                    value = getFeaturePersistValue("su_compat")
                                 }
-                                var savedSuStatus by rememberSaveable { mutableStateOf("") }
-                                val suStatus by produceState(initialValue = savedSuStatus) {
-                                    value = withContext(Dispatchers.IO) {
-                                        savedSuStatus = getFeatureStatus("su_compat")
-                                        return@withContext savedSuStatus
+                                LaunchedEffect(suPersistValue) {
+                                    suPersistValue?.let { v ->
+                                        suCompatMode =
+                                            if (v == 0L) 2 else if (!currentSuEnabled) 1 else 0
                                     }
+                                }
+
+                                val suStatus by produceState(initialValue = "") {
+                                    value = getFeatureStatus("su_compat")
                                 }
                                 val suSummary = when (suStatus) {
-                                    "unsupported" -> {
-                                        suCompatMode = 0 // fix wrongly display
-                                        stringResource(id = R.string.feature_status_unsupported_summary)
-                                    }
-
+                                    "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
                                     "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                     else -> stringResource(id = R.string.settings_sucompat_summary)
                                 }
@@ -307,67 +304,156 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                 )
                             }
 
-                            item {
-                                var suLogMode by rememberSaveable {
-                                    mutableIntStateOf(
-                                        run {
-                                            val currentEnabled = Natives.isSuLogEnabled()
-                                            val savedPersist = prefs.getInt("sulog_mode", 0)
-                                            if (savedPersist == 2) 2 else if (!currentEnabled) 1 else 0
-                                        }
+                            item(
+                                visible = Natives.isLateLoadMode
+                            ) {
+                                var savedAutoJailbreakStatus by rememberSaveable {
+                                    mutableStateOf(
+                                        prefs.getBoolean("auto_jailbreak", false)
                                     )
                                 }
-                                var savedSuLogStatus by rememberSaveable { mutableStateOf("") }
-                                val suLogStatus by produceState(initialValue = savedSuLogStatus) {
+
+                                SettingsSwitchWidget(
+                                    icon = Icons.Rounded.ElectricalServices,
+                                    title = stringResource(id = R.string.settings_auto_jailbreak),
+                                    description = stringResource(id = R.string.settings_auto_jailbreak_summary),
+                                    checked = savedAutoJailbreakStatus,
+                                    onCheckedChange = { value ->
+                                        runCatching {
+                                            ksuApp.packageManager.setComponentEnabledSetting(
+                                                ComponentName(
+                                                    ksuApp,
+                                                    BootCompletedReceiver::class.java
+                                                ),
+                                                if (value) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                                PackageManager.DONT_KILL_APP
+                                            )
+                                        }.onFailure {
+                                            Log.e(
+                                                "Settings",
+                                                "failed to change boot receiver state to $value",
+                                                it
+                                            )
+                                        }
+                                        prefs.edit {
+                                            putBoolean("auto_jailbreak", value)
+                                        }
+                                        savedAutoJailbreakStatus = value
+                                    }
+                                )
+                            }
+
+                            item(
+                                visible = Build.VERSION.SDK_INT > Build.VERSION_CODES.Q
+                            ) {
+                                var isAdbRootEnabled by remember { mutableStateOf(false) }
+
+                                var savedAdbRootStatus by rememberSaveable { mutableStateOf("") }
+                                val adbRootStatus by produceState(initialValue = savedAdbRootStatus) {
                                     value = withContext(Dispatchers.IO) {
-                                        savedSuLogStatus = getFeatureStatus("sulog")
-                                        return@withContext savedSuLogStatus
+                                        savedAdbRootStatus = getFeatureStatus("adb_root")
+                                        isAdbRootEnabled = getFeaturePersistValue("adb_root") == 1L
+                                        return@withContext savedAdbRootStatus
                                     }
                                 }
-                                val suLogSummary = when (suLogStatus) {
-                                    "unsupported" -> {
-                                        isSuLogEnabled =
-                                            true // some old kernel support sulog, we need allow show sulog in there
-                                        suLogMode = 0 // fix wrongly display
-                                        stringResource(id = R.string.feature_status_unsupported_summary)
-                                    }
+                                val adbRootSummary = when (adbRootStatus) {
+                                    "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                    "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                    else -> stringResource(id = R.string.settings_adb_root_summary)
+                                }
 
+                                SettingsSwitchWidget(
+                                    icon = Icons.Filled.Adb,
+                                    title = stringResource(id = R.string.settings_adb_root),
+                                    description = adbRootSummary,
+                                    checked = isAdbRootEnabled,
+                                    enabled = adbRootStatus == "supported",
+                                    onCheckedChange = { checked ->
+                                        if (execKsud("feature set adb_root ${if (checked) 1 else 0}", true)) {
+                                            ShellUtils.fastCmd("setprop ctl.restart adbd")
+                                            execKsud("feature save", true)
+                                        }
+                                        isAdbRootEnabled = checked
+                                    }
+                                )
+                            }
+
+
+                            item {
+                                var isSuLogEnabled by remember { mutableStateOf(Natives.isSuLogEnabled()) }
+
+                                var savedSulogStatus by rememberSaveable { mutableStateOf("") }
+                                val sulogStatus by produceState(initialValue = savedSulogStatus) {
+                                    value = withContext(Dispatchers.IO) {
+                                        savedSulogStatus = getFeatureStatus("sulog")
+                                        return@withContext savedSulogStatus
+                                    }
+                                }
+                                val sulogSummary = when (sulogStatus) {
+                                    "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
                                     "managed" -> stringResource(id = R.string.feature_status_managed_summary)
                                     else -> stringResource(id = R.string.settings_sulog_summary)
                                 }
-                                SettingsDropdownWidget(
-                                    icon = Icons.Default.RemoveRedEye,
+                                SettingsSwitchWidget(
+                                    icon = Icons.AutoMirrored.Rounded.Article,
                                     title = stringResource(id = R.string.settings_sulog),
-                                    description = suLogSummary,
-                                    items = modeItems,
-                                    enabled = suLogStatus == "supported",
-                                    selectedIndex = suLogMode,
-                                    onSelectedIndexChange = { index ->
-                                        when (index) {
-                                            // Default: enable and save to persist
-                                            0 -> if (Natives.setSuLogEnabled(true)) {
-                                                execKsud("feature save", true)
-                                                prefs.edit { putInt("sulog_mode", 0) }
-                                                suLogMode = 0
-                                                isSuLogEnabled = true
-                                            }
+                                    description = sulogSummary,
+                                    enabled = sulogStatus == "supported",
+                                    checked = isSuLogEnabled,
+                                    onCheckedChange = { checked ->
+                                        if (Natives.setSuLogEnabled(checked)) {
+                                            execKsud("feature save", true)
+                                            isSuLogEnabled = checked
+                                        }
+                                    }
+                                )
+                            }
 
-                                            // Temporarily disable: save enabled state first, then disable
-                                            1 -> if (Natives.setSuLogEnabled(true)) {
-                                                execKsud("feature save", true)
-                                                if (Natives.setSuLogEnabled(false)) {
-                                                    prefs.edit { putInt("sulog_mode", 0) }
-                                                    suLogMode = 1
-                                                    isSuLogEnabled = false
-                                                }
-                                            }
 
-                                            // Permanently disable: disable and save
-                                            2 -> if (Natives.setSuLogEnabled(false)) {
-                                                execKsud("feature save", true)
-                                                prefs.edit { putInt("sulog_mode", 2) }
-                                                suLogMode = 2
-                                                isSuLogEnabled = false
+                            item {
+                                var isSelinuxHideEnabled by remember { mutableStateOf(Natives.isSelinuxHideEnabled()) }
+
+                                var savedSelinuxHideStatus by rememberSaveable { mutableStateOf("") }
+                                val selinuxHideStatus by produceState(initialValue = savedSelinuxHideStatus) {
+                                    value = withContext(Dispatchers.IO) {
+                                        savedSelinuxHideStatus = getFeatureStatus("selinux_hide")
+                                        return@withContext savedSelinuxHideStatus
+                                    }
+                                }
+                                val selinuxHideSummary = when (selinuxHideStatus) {
+                                    "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                    "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                    else -> stringResource(id = R.string.settings_selinux_hide_summary)
+                                }
+                                SettingsSwitchWidget(
+                                    icon = Icons.Filled.Policy,
+                                    title = stringResource(id = R.string.settings_selinux_hide),
+                                    description = selinuxHideSummary,
+                                    enabled = selinuxHideStatus == "supported",
+                                    checked = isSelinuxHideEnabled,
+                                    onCheckedChange = { checked ->
+                                        val status = Natives.setSelinuxHideEnabled(checked)
+                                        execKsud("feature save", true)
+                                        isSelinuxHideEnabled = checked
+
+                                        when (status) {
+                                            0 -> {}
+                                            -OsConstants.EAGAIN -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    R.string.settings_selinux_hide_reboot_required,
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                            else -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    ksuApp.getString(
+                                                        R.string.settings_selinux_hide_failed,
+                                                        status
+                                                    ),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
                                             }
                                         }
                                     }
@@ -396,7 +482,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
             item {
                 // 应用设置卡片
-                SplicedColumnGroup(
+                SegmentedColumn(
                     title = stringResource(R.string.app_settings),
                     content = {
                         item {
@@ -423,7 +509,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                 title = stringResource(R.string.more_settings),
                                 description = stringResource(R.string.more_settings),
                                 onClick = {
-                                    navigator.navigate(MoreSettingsScreenDestination)
+                                    navigator.push(Route.MoreSettings)
                                 }
                             )
                         }
@@ -433,7 +519,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
             item {
                 // 工具卡片
-                SplicedColumnGroup(
+                SegmentedColumn(
                     title = stringResource(R.string.tools),
                     content = {
                         item {
@@ -446,20 +532,6 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                             ) {}
                         }
 
-                        if (ksuIsValid() && isSuLogEnabled) {
-                            item {
-                                // 查看使用日志
-                                SettingsJumpPageWidget(
-                                    icon = Icons.Filled.Visibility,
-                                    title = stringResource(R.string.log_viewer_view_logs),
-                                    description = stringResource(R.string.log_viewer_view_logs_summary),
-                                    onClick = {
-                                        navigator.navigate(LogViewerScreenDestination)
-                                    }
-                                )
-                            }
-                        }
-
                         if (ksuIsValid()) {
                             item(visible = isKernelUmountEnabled) {
                                 SettingsJumpPageWidget(
@@ -467,7 +539,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                     title = stringResource(R.string.umount_path_manager),
                                     description = stringResource(R.string.umount_path_manager_summary),
                                     onClick = {
-                                        navigator.navigate(UmountManagerScreenDestination)
+                                        navigator.push(Route.UmountManager)
                                     }
                                 )
                             }
@@ -475,7 +547,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
                         if (Natives.isLkmMode) {
                             item {
-                                UninstallItem(navigator) {
+                                UninstallItem {
                                     loadingDialog.withLoading(it)
                                 }
                             }
@@ -486,6 +558,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
             if (showBottomsheet) {
                 item {
+                    val sendLog = stringResource(R.string.send_log)
                     LogBottomSheet(
                         onDismiss = { showBottomsheet = false },
                         onSaveLog = {
@@ -517,7 +590,7 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
                                 context.startActivity(
                                     Intent.createChooser(
                                         shareIntent,
-                                        context.getString(R.string.send_log)
+                                        sendLog
                                     )
                                 )
 
@@ -530,17 +603,17 @@ fun SettingsPage(navigator: DestinationsNavigator, bottomPadding: Dp, hazeState:
 
             // 关于卡片
             item {
-                SplicedColumnGroup(
+                SegmentedColumn(
                     title = stringResource(R.string.about),
                     content = {
                         item {
-                            SettingsBaseWidget(
+                            SettingsJumpPageWidget(
                                 icon = Icons.Filled.Info,
                                 title = stringResource(R.string.about),
                                 onClick = {
-                                    aboutDialog.show()
+                                    navigator.push(Route.About)
                                 }
-                            ) {}
+                            )
                         }
                     }
                 )
@@ -616,11 +689,12 @@ fun LogActionButton(
     }
 }
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun UninstallItem(
-    navigator: DestinationsNavigator,
     withLoading: suspend (suspend () -> Unit) -> Unit
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uninstallConfirmDialog = rememberConfirmDialog()
@@ -637,12 +711,8 @@ fun UninstallItem(
                 withLoading {
                     when (uninstallType) {
                         UninstallType.TEMPORARY -> showTodo()
-                        UninstallType.PERMANENT -> navigator.navigate(
-                            FlashScreenDestination(FlashIt.FlashUninstall)
-                        )
-                        UninstallType.RESTORE_STOCK_IMAGE -> navigator.navigate(
-                            FlashScreenDestination(FlashIt.FlashRestore)
-                        )
+                        UninstallType.PERMANENT -> navigator.push(Route.Flash(FlashIt.FlashUninstall))
+                        UninstallType.RESTORE_STOCK_IMAGE -> navigator.push(Route.Flash(FlashIt.FlashRestore))
                         UninstallType.NONE -> Unit
                     }
                 }
@@ -696,121 +766,115 @@ fun rememberUninstallDialog(onSelected: (UninstallType) -> Unit): DialogHandle {
 
         var selectedOption by remember { mutableStateOf<UninstallType?>(null) }
 
-        MaterialTheme(
-            colorScheme = MaterialTheme.colorScheme.copy(
-                surface = MaterialTheme.colorScheme.surfaceContainerHigh
-            )
-        ) {
-            AlertDialog(
-                onDismissRequest = {
-                    dismiss()
-                },
-                title = {
-                    Text(
-                        text = stringResource(R.string.settings_uninstall),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                },
-                text = {
-                    Column(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        options.forEachIndexed { index, option ->
-                            val isSelected = selectedOption == option
-                            val backgroundColor = if (isSelected)
-                                MaterialTheme.colorScheme.primaryContainer
-                            else
-                                Color.Transparent
-                            val contentColor = if (isSelected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurface
+        AlertDialog(
+            onDismissRequest = {
+                dismiss()
+            },
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_uninstall),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    options.forEachIndexed { index, option ->
+                        val isSelected = selectedOption == option
+                        val backgroundColor = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            Color.Transparent
+                        val contentColor = if (isSelected)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurface
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .background(backgroundColor)
-                                    .clickable {
-                                        selectedOption = option
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = option.icon,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .padding(end = 16.dp)
-                                        .size(24.dp)
-                                )
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = listOptions[index].titleText,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                    listOptions[index].subtitleText?.let {
-                                        Text(
-                                            text = it,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (isSelected)
-                                                contentColor.copy(alpha = 0.8f)
-                                            else
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(backgroundColor)
+                                .clickable {
+                                    selectedOption = option
                                 }
-                                if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.RadioButtonChecked,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Default.RadioButtonUnchecked,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(24.dp)
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = option.icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(end = 16.dp)
+                                    .size(24.dp)
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = listOptions[index].titleText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                listOptions[index].subtitleText?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSelected)
+                                            contentColor.copy(alpha = 0.8f)
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.RadioButtonChecked,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            selectedOption?.let { onSelected(it) }
-                            dismiss()
-                        },
-                        enabled = selectedOption != null,
-                    ) {
-                        Text(
-                            text = stringResource(android.R.string.ok)
-                        )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        selectedOption?.let { onSelected(it) }
+                        dismiss()
+                    },
+                    enabled = selectedOption != null,
+                ) {
+                    Text(
+                        text = stringResource(android.R.string.ok)
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        dismiss()
                     }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            dismiss()
-                        }
-                    ) {
-                        Text(
-                            text = stringResource(android.R.string.cancel),
-                        )
-                    }
-                },
-                shape = MaterialTheme.shapes.extraLarge,
-                tonalElevation = 4.dp
-            )
-        }
+                ) {
+                    Text(
+                        text = stringResource(android.R.string.cancel),
+                    )
+                }
+            },
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 4.dp
+        )
     }
 }
 
@@ -818,38 +882,24 @@ fun rememberUninstallDialog(onSelected: (UninstallType) -> Unit): DialogHandle {
 @Composable
 private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null,
-    hazeState: HazeState? = null
 ) {
-    val hazeStyle = if (ThemeConfig.backgroundImageLoaded) HazeStyle(
-        backgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-            alpha = 0.8f
-        ),
-        tint = HazeTint(Color.Transparent)
-    ) else null
-
-    val collapsedFraction = scrollBehavior?.state?.collapsedFraction ?: 0f
-    val modifier = if (ThemeConfig.backgroundImageLoaded && hazeStyle != null && hazeState != null) {
-        Modifier.hazeEffect(hazeState) {
-            style = hazeStyle
-            noiseFactor = 0f
-            blurRadius = 30.dp
-            alpha = collapsedFraction
-        }
-    }
-    else Modifier
-
     LargeFlexibleTopAppBar(
-        modifier = modifier,
+        modifier = Modifier.blurEffect(
+        ),
         title = {
             Text(text = stringResource(R.string.settings))
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
             scrolledContainerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha)
         ),
         windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
         scrollBehavior = scrollBehavior

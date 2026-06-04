@@ -1,5 +1,6 @@
 package com.resukisu.resukisu.ui.util
 
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Environment
 import android.os.Parcelable
@@ -20,7 +21,6 @@ import org.json.JSONArray
 import java.io.File
 import java.util.Properties
 
-
 /**
  * @author weishu
  * @date 2023/1/1.
@@ -31,6 +31,7 @@ private fun getKsuDaemonPath(): String {
     return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
 }
 
+@SuppressLint("RestrictedApi")
 object KsuCli {
     var SHELL: Shell = createRootShell()
     val GLOBAL_MNT_SHELL: Shell = createRootShell(true)
@@ -40,6 +41,26 @@ fun getRootShell(globalMnt: Boolean = false): Shell {
     return if (globalMnt) KsuCli.GLOBAL_MNT_SHELL else {
         KsuCli.SHELL
     }
+}
+
+fun generateMainShellBuilder(): Shell.Builder {
+    val builder = Shell.Builder.create()
+    try {
+        builder.setCommands(getKsuDaemonPath(), "debug", "su")
+        builder.build()
+    } catch (e: Throwable) {
+        Log.w(TAG, "ksu failed: ", e)
+        try {
+            builder.setCommands("su")
+            builder.build()
+        } catch (e: Throwable) {
+            Log.e(TAG, "su failed: ", e)
+            builder.setCommands("sh")
+            builder.build()
+        }
+    }
+
+    return builder
 }
 
 inline fun <T> withNewRootShell(
@@ -83,6 +104,15 @@ fun execKsud(args: String, newShell: Boolean = false): Boolean {
     }
 }
 
+suspend fun isOfficialSignature(): Boolean = withContext(Dispatchers.IO) {
+    val shell = getRootShell()
+    val out = shell.newJob()
+        .add("${getKsuDaemonPath()} debug get-sign ${ksuApp.packageResourcePath}")
+        .to(ArrayList<String>(), null).exec().out
+    out.firstOrNull()?.trim()
+        .orEmpty() == "size: 0x377, hash: d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64"
+}
+
 suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.IO) {
     val shell = getRootShell()
     val out = shell.newJob()
@@ -90,9 +120,18 @@ suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.
     out.firstOrNull()?.trim().orEmpty()
 }
 
+suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatchers.IO) {
+    val shell = getRootShell()
+    val out = shell.newJob()
+        .add("${getKsuDaemonPath()} feature get --config $feature").to(ArrayList<String>(), null)
+        .exec().out
+    val valueLine = out.firstOrNull { it.trim().startsWith("Value:") } ?: return@withContext null
+    valueLine.substringAfter("Value:").trim().toLongOrNull()
+}
 fun install() {
     val start = SystemClock.elapsedRealtime()
-    val result = execKsud("install", true)
+    val libadbroot = File(ksuApp.applicationInfo.nativeLibraryDir, "libadbroot.so").absolutePath
+    val result = execKsud("install --libadbroot $libadbroot", true)
     Log.w(TAG, "install result: $result, cost: ${SystemClock.elapsedRealtime() - start}ms")
 }
 
@@ -194,8 +233,6 @@ fun flashModule(
 fun runModuleAction(
     moduleId: String, onStdout: (String) -> Unit, onStderr: (String) -> Unit
 ): Boolean {
-    val shell = createRootShell(true)
-
     val stdoutCallback: CallbackList<String?> = object : CallbackList<String?>() {
         override fun onAddElement(s: String?) {
             onStdout(s ?: "")
@@ -208,8 +245,11 @@ fun runModuleAction(
         }
     }
 
-    val result = shell.newJob().add("${getKsuDaemonPath()} module action $moduleId")
-        .to(stdoutCallback, stderrCallback).exec()
+    val result = withNewRootShell(true) {
+        newJob().add("${getKsuDaemonPath()} module action $moduleId")
+            .to(stdoutCallback, stderrCallback).exec()
+    }
+
     Log.i("KernelSU", "Module runAction result: $result")
 
     return result.isSuccess
@@ -220,7 +260,7 @@ fun restoreBoot(
 ): Boolean {
     val magiskboot = File(ksuApp.applicationInfo.nativeLibraryDir, "libmagiskboot.so")
     val result = flashWithIO(
-        "${getKsuDaemonPath()} boot-restore -f --magiskboot $magiskboot",
+        "${getKsuDaemonPath()} boot-restore -f",
         onStdout,
         onStderr
     )
@@ -231,9 +271,8 @@ fun restoreBoot(
 fun uninstallPermanently(
     onFinish: (Boolean, Int) -> Unit, onStdout: (String) -> Unit, onStderr: (String) -> Unit
 ): Boolean {
-    val magiskboot = File(ksuApp.applicationInfo.nativeLibraryDir, "libmagiskboot.so")
     val result =
-        flashWithIO("${getKsuDaemonPath()} uninstall --magiskboot $magiskboot", onStdout, onStderr)
+        flashWithIO("${getKsuDaemonPath()} uninstall --package-name ${BuildConfig.APPLICATION_ID}", onStdout, onStderr)
     onFinish(result.isSuccess, result.code)
     return result.isSuccess
 }
@@ -329,6 +368,10 @@ fun installBoot(
 }
 
 fun reboot(reason: String = "") {
+    if (reason == "soft_reboot") {
+        execKsud("soft-reboot", true)
+        return
+    }
     val shell = getRootShell()
     if (reason == "recovery") {
         // KEYCODE_POWER = 26, hide incorrect "Factory data reset" message

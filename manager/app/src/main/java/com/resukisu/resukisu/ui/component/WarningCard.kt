@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.resukisu.resukisu.ui.theme.CardConfig
@@ -36,8 +38,71 @@ import com.resukisu.resukisu.ui.theme.getCardElevation
 @Composable
 fun WarningCard(
     modifier: Modifier = Modifier,
-    shape: Shape = CardDefaults.elevatedShape,
+    shape: Shape = RoundedCornerShape(16.dp),
     message: String,
+    content: (@Composable () -> Unit) = {},
+    color: Color? = null,
+    onClick: (() -> Unit)? = null,
+    onClose: (() -> Unit)? = null,
+    icon: (@Composable () -> Unit)? = null
+) {
+    WarningCardInner(
+        modifier = modifier,
+        shape = shape,
+        content = {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMediumEmphasized,
+                modifier = Modifier
+                    .wrapContentHeight(Alignment.CenterVertically)
+            )
+        },
+        color = color,
+        end = content,
+        onClick = onClick,
+        onClose = onClose,
+        icon = icon
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun WarningCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(16.dp),
+    message: AnnotatedString,
+    content: (@Composable () -> Unit) = {},
+    color: Color? = null,
+    onClick: (() -> Unit)? = null,
+    onClose: (() -> Unit)? = null,
+    icon: (@Composable () -> Unit)? = null
+) {
+    WarningCardInner(
+        modifier = modifier,
+        shape = shape,
+        content = {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMediumEmphasized,
+                modifier = Modifier
+                    .wrapContentHeight(Alignment.CenterVertically)
+            )
+        },
+        color = color,
+        end = content,
+        onClick = onClick,
+        onClose = onClose,
+        icon = icon
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun WarningCardInner(
+    modifier: Modifier = Modifier,
+    shape: Shape = CardDefaults.elevatedShape,
+    content: (@Composable () -> Unit),
+    end: (@Composable () -> Unit),
     color: Color? = null,
     onClick: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null,
@@ -56,6 +121,7 @@ fun WarningCard(
                 disabledContentColor = MaterialTheme.colorScheme.onErrorContainer
             )
         }
+
         else -> {
             CardDefaults.cardColors(
                 containerColor = color,
@@ -97,12 +163,7 @@ fun WarningCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMediumEmphasized,
-                    modifier = Modifier
-                        .wrapContentHeight(Alignment.CenterVertically)
-                )
+                content()
             }
 
 
@@ -117,6 +178,12 @@ fun WarningCard(
                         .size(18.dp)
                         .align(Alignment.TopEnd)
                 )
+            }
+
+            Box(
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                end()
             }
         }
     }

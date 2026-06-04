@@ -1,7 +1,10 @@
-use std::path::Path;
+use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result};
+use libc::_exit;
 use log::{info, warn};
+use prop_rs_android::{resetprop::ResetProp, sys_prop};
+use rustix::process::chdir;
 
 #[cfg(all(target_arch = "aarch64", target_os = "android"))]
 use crate::android::kpm;
@@ -10,7 +13,7 @@ use crate::{
         dynamic_manager, ksucalls,
         module::{self, handle_updated_modules, metamodule, prune_modules},
         restorecon,
-        utils::{self, is_safe_mode},
+        utils::{self, is_safe_mode, switch_mnt_ns},
     },
     assets, defs,
 };
@@ -73,6 +76,13 @@ pub fn on_post_data_fs() -> Result<()> {
         warn!("prune modules failed: {e}");
     }
 
+    // Refresh /metadata/watchdog/ksu/modules.rc so the next boot's kernel hook sees the
+    // current module set. Acts as a safety net when state was changed outside
+    // of ksud's normal mutation commands.
+    if let Err(e) = crate::android::module::regenerate_preinit_rc() {
+        warn!("regenerate preinit rc failed: {e}");
+    }
+
     if let Err(e) = restorecon::restorecon() {
         warn!("restorecon failed: {e}");
     }
@@ -109,12 +119,6 @@ pub fn on_post_data_fs() -> Result<()> {
         warn!("exec post-fs-data scripts failed: {e}");
     }
 
-    // exec lua script on post-fs-data
-    #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-    if let Err(e) = module::exec_stage_lua("post-fs-data", true, "kernelsu") {
-        warn!("Failed to exec post-fs-data lua: {e}");
-    }
-
     // load system.prop
     if let Err(e) = module::load_system_prop() {
         warn!("load system.prop failed: {e}");
@@ -137,7 +141,7 @@ pub fn on_post_data_fs() -> Result<()> {
     Ok(())
 }
 
-fn run_stage(stage: &str, block: bool) {
+pub fn run_stage(stage: &str, block: bool) {
     utils::umask(0);
 
     if utils::has_magisk() {
@@ -163,12 +167,6 @@ fn run_stage(stage: &str, block: bool) {
     if let Err(e) = module::exec_stage_script(stage, block) {
         warn!("Failed to exec {stage} scripts: {e}");
     }
-
-    // run lua stage script
-    #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-    if let Err(e) = module::exec_stage_lua(stage, block, "kernelsu") {
-        warn!("Failed to exec {stage} lua: {e}");
-    }
 }
 
 pub fn on_services() {
@@ -181,6 +179,35 @@ pub fn on_boot_completed() {
     info!("on_boot_completed triggered!");
 
     run_stage("boot-completed", false);
+}
+
+const fn resetprop() -> ResetProp {
+    ResetProp {
+        skip_svc: true,
+        persistent: false,
+        persist_only: false,
+        verbose: false,
+        show_context: false,
+    }
+}
+
+fn reset_boot_completed() -> Result<()> {
+    sys_prop::init().context("Failed to initialize system property API")?;
+    let rp = resetprop();
+    // Set prop value to 0 in advance to ensure resetprop -w works
+    info!("reset boot complete prop to 0");
+    rp.set("sys.boot_completed", "0")
+        .context("Failed to set sys.boot_completed to 0")?;
+    Ok(())
+}
+
+fn wait_for_boot_completed() -> Result<()> {
+    sys_prop::init().context("Failed to initialize system property API")?;
+    let rp = resetprop();
+    info!("waiting for boot complete");
+    rp.wait("sys.boot_completed", Some("0"), None)
+        .context("wait for sys.boot_completed failed")?;
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -218,4 +245,40 @@ fn catch_bootlog(logname: &str, command: &[&str]) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn soft_reboot() -> Result<()> {
+    utils::daemonize_with(true, || -> Result<()> {
+        switch_mnt_ns(1)?;
+        chdir("/")?;
+        Ok(())
+    })?;
+
+    info!("emulating soft_reboot!");
+    if let Err(e) = reset_boot_completed() {
+        warn!("reset boot completed failed: {e}");
+    }
+    run_stage("emulated-soft-reboot", true);
+    info!("stop");
+    let status = Command::new("stop").status().context("stop failed")?;
+    if !status.success() {
+        warn!("stop exited with status: {status}");
+    }
+    info!("post-fs-data");
+    on_post_data_fs()?;
+    info!("start");
+    let status = Command::new("start").status().context("start failed")?;
+    if !status.success() {
+        warn!("start exited with status: {status}");
+    }
+    info!("services");
+    on_services();
+    if let Err(e) = wait_for_boot_completed() {
+        warn!("wait for boot completed failed: {e}");
+    }
+    on_boot_completed();
+
+    unsafe {
+        _exit(0);
+    }
 }
